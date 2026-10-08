@@ -278,6 +278,8 @@ export async function proxy(request) {
   // Redirect / to /dashboard if logged in, or /dashboard if it's the root
   if (pathname === "/login") { return NextResponse.redirect(new URL("/dashboard", request.url)); }
 
+  if (pathname === "/login") { return NextResponse.redirect(new URL("/dashboard", request.url)); }
+
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

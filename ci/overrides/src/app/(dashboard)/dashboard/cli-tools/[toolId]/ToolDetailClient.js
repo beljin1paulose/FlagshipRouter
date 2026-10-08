@@ -45,6 +45,7 @@ export default function ToolDetailClient({ toolId, machineId }) {
           const seen = new Set(connections.map((c) => c.provider));
           for (const p of catalog.providers || []) {
             if (!p?.ready || !p.id || seen.has(p.id) || p.hidden) continue;
+            if (!(p.noAuth || (p.connected || 0) > 0)) continue;
             seen.add(p.id);
             connections.push({
               id: `catalog:${p.id}`,
@@ -133,8 +134,6 @@ export default function ToolDetailClient({ toolId, machineId }) {
     });
   }, []);
 
-  // Desktop default is always the local router. Tunnel/cloud stay available in
-  // the endpoint dropdown — they must not auto-replace localhost.
   const getBaseUrl = () => {
     if (typeof window !== "undefined") return window.location.origin;
     return "http://localhost:20120";
