@@ -350,7 +350,7 @@ export default function CoworkToolCard({
                         ))
                       )}
                     </div>
-                    <button onClick={() => setComboModalOpen(true)} disabled={!hasActiveProviders} className={`shrink-0 px-2 py-1.5 rounded border text-xs whitespace-nowrap transition-colors ${hasActiveProviders ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20 cursor-pointer" : "opacity-50 cursor-not-allowed border-border"}`}>+ Combo</button>
+                    <button onClick={() => setComboModalOpen(true)} className="w-full sm:w-auto rounded border px-2 py-2 text-xs transition-colors sm:py-1.5 whitespace-nowrap sm:shrink-0 bg-surface border-border text-text-main hover:border-primary cursor-pointer">+ Combo</button>
                   </div>
                 </div>
 

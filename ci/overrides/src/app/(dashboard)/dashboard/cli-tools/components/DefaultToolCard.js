@@ -67,12 +67,7 @@ export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, ba
         />
         <button
           onClick={() => setShowModelModal(true)}
-          disabled={!hasActiveProviders}
-          className={`shrink-0 px-3 py-2 rounded-lg border text-sm transition-colors ${
-            hasActiveProviders
-              ? "bg-bg-secondary border-border text-text-main hover:border-primary cursor-pointer"
-              : "opacity-50 cursor-not-allowed border-border"
-          }`}
+          className="shrink-0 px-3 py-2 rounded-lg border text-sm transition-colors bg-bg-secondary border-border text-text-main hover:border-primary cursor-pointer"
         >
           Select Model
         </button>
