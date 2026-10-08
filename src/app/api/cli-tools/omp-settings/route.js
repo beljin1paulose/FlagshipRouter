@@ -4,12 +4,11 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import { exec } from "child_process";
-import { promisify } from "util";
 import { BRAND } from "open-sse/config/brand.js";
 import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
+import { execCached } from "@/lib/execCache";
 
-const execAsync = promisify(exec);
+const execAsync = (cmd, opts) => execCached(cmd, opts);
 
 const PROVIDER_ID = BRAND.modelPrefix;
 const getOmpDir = () => path.join(os.homedir(), ".omp", "agent");

@@ -1,15 +1,14 @@
 "use server";
 
 import { NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { DEFAULT_PLUGINS } from "@/shared/constants/coworkPlugins";
 import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
+import { execCached } from "@/lib/execCache";
 
-const execAsync = promisify(exec);
+const execAsync = (cmd, opts) => execCached(cmd, opts);
 
 // Exa MCP def — reuse from coworkPlugins (DRY).
 const EXA_PLUGIN = DEFAULT_PLUGINS.find((p) => p.name === "exa");

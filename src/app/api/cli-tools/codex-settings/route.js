@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { parseTOML, stringifyTOML } from "confbox";
 import { BRAND } from "open-sse/config/brand.js";
 import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
+import { execCached } from "@/lib/execCache";
 
 export const dynamic = "force-dynamic";
 
-const execAsync = promisify(exec);
+const execAsync = (cmd, opts) => execCached(cmd, opts);
 
 const getCodexDir = () => path.join(os.homedir(), ".codex");
 const getCodexConfigPath = () => path.join(getCodexDir(), "config.toml");

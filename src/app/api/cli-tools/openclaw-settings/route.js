@@ -1,15 +1,14 @@
 "use server";
 
 import { NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { BRAND } from "open-sse/config/brand.js";
 import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
+import { execCached } from "@/lib/execCache";
 
-const execAsync = promisify(exec);
+const execAsync = (cmd, opts) => execCached(cmd, opts);
 
 // OpenClaw 2026.5.x writes agents[].model as either a plain string
 // (legacy) or as an object `{ primary, fallbacks }`. Normalize to the

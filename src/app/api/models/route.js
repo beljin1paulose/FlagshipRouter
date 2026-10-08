@@ -5,8 +5,33 @@ import { AI_MODELS } from "@/shared/constants/config";
 import { getProviderAlias } from "@/shared/constants/providers";
 import { getCapabilitiesForModel } from "open-sse/providers/capabilities.js";
 
+// Short-TTL response cache: the model list only changes when aliases or the
+// disabled list change (both are also invalidated below), but this route
+// rebuilds 1100+ entries with capability lookups on every call.
+const MODELS_TTL_MS = 15_000;
+let modelsCache = { at: 0, body: null };
+let modelsInflight = null;
+
+function invalidateModelsCache() {
+  modelsCache = { at: 0, body: null };
+}
+
 // GET /api/models - Get models with aliases
 export async function GET() {
+  if (modelsCache.body && Date.now() - modelsCache.at < MODELS_TTL_MS) {
+    return NextResponse.json(modelsCache.body);
+  }
+  if (modelsInflight) return NextResponse.json(await modelsInflight);
+  modelsInflight = buildModels()
+    .then((body) => {
+      if (!body?.error) modelsCache = { at: Date.now(), body };
+      return body;
+    })
+    .finally(() => { modelsInflight = null; });
+  return NextResponse.json(await modelsInflight);
+}
+
+async function buildModels() {
   try {
     const modelAliases = await getModelAliases();
     const disabled = await getDisabledModels();
@@ -64,10 +89,10 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({ models });
+    return { models };
   } catch (error) {
     console.log("Error fetching models:", error);
-    return NextResponse.json({ error: "Failed to fetch models" }, { status: 500 });
+    return { error: "Failed to fetch models" };
   }
 }
 
@@ -94,6 +119,7 @@ export async function PUT(request) {
 
     // Update alias
     await setModelAlias(model, alias);
+    invalidateModelsCache();
 
     return NextResponse.json({ success: true, model, alias });
   } catch (error) {

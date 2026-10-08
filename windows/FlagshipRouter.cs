@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -329,7 +331,13 @@ sealed class FlagshipRouterApp : Form
         "/api/cli-tools/all-statuses",
         "/dashboard/usage",
         "/dashboard/models",
-        "/dashboard/providers"
+        "/dashboard/providers",
+        // API routes the Models/CLI pages fetch after hydration — compile them
+        // up front so first page open isn't paying route compilation.
+        "/api/models/catalog",
+        "/api/models",
+        "/api/providers",
+        "/api/settings"
     };
 
     void WarmupServer()
@@ -339,16 +347,20 @@ sealed class FlagshipRouterApp : Form
             try
             {
                 Thread.Sleep(1500);
-                using (var client = new System.Net.WebClient())
+                // Parallel: each route compiles independently, so sequential
+                // warmup cost (sum) became the startup wait (~6s → ~2s).
+                var jobs = WarmupPaths.Select(p => Task.Run(() =>
                 {
-                    client.Headers.Add("User-Agent", "FlagshipRouter-Warmup");
-                    foreach (var p in WarmupPaths)
+                    if (quitting) return;
+                    try
                     {
-                        if (quitting) return;
-                        try { client.DownloadString("http://127.0.0.1:" + Port + p); }
-                        catch { }
+                        using var client = new System.Net.WebClient();
+                        client.Headers.Add("User-Agent", "FlagshipRouter-Warmup");
+                        client.DownloadString("http://127.0.0.1:" + Port + p);
                     }
-                }
+                    catch { }
+                })).ToArray();
+                Task.WaitAll(jobs, 30000);
                 Log("warmup done");
             }
             catch { }
@@ -361,20 +373,27 @@ sealed class FlagshipRouterApp : Form
     System.Windows.Forms.Timer warmKeeper;
     void StartWarmKeeper()
     {
+        int tick = 0;
         warmKeeper = new System.Windows.Forms.Timer();
         warmKeeper.Interval = 30000;
         warmKeeper.Tick += (s, e) =>
         {
             if (quitting) return;
-            try
+            // Rotate: dashboard every tick, API routes on alternate ticks so the
+            // Models/CLI data endpoints stay compiled (they evict first after idle).
+            var paths = (tick++ % 2 == 0)
+                ? new[] { "/dashboard" }
+                : new[] { "/api/models/catalog", "/api/cli-tools/all-statuses" };
+            foreach (var p in paths)
             {
-                using (var c = new System.Net.WebClient())
+                try
                 {
+                    using var c = new WebClient();
                     c.Headers.Add("User-Agent", "FlagshipRouter-Keeper");
-                    c.DownloadString("http://127.0.0.1:" + Port + "/dashboard");
+                    c.DownloadString("http://127.0.0.1:" + Port + p);
                 }
+                catch { }
             }
-            catch { }
         };
         warmKeeper.Start();
     }
