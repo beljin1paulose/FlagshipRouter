@@ -9,9 +9,19 @@ const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const log = execSync("git log --oneline -40 --grep=Sync", { encoding: "utf8" });
-const base = log.trim().split("\n")[0].split(" ")[0];
-console.log("base:", log.trim().split("\n")[0]);
+// Prefer FETCH_HEAD if the caller just fetched upstream; otherwise the last
+// "Sync upstream" commit. Never use a Sync commit that already contains our
+// overrides — that would shrink the mirror.
+let base = "";
+try {
+  const fetchHead = execSync("git rev-parse --verify FETCH_HEAD", { encoding: "utf8" }).trim();
+  if (fetchHead) base = fetchHead;
+} catch {}
+if (!base) {
+  const log = execSync("git log --oneline -40 --grep=Sync", { encoding: "utf8" });
+  base = log.trim().split("\n")[0].split(" ")[0];
+}
+console.log("base:", base);
 
 const files = execSync(`git diff --name-only ${base} HEAD -- src open-sse`, { encoding: "utf8" })
   .trim().split("\n").filter(Boolean);
