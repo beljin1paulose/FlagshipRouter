@@ -176,6 +176,7 @@ export default function CombosPage() {
         // the combo picker even when the user has not saved a connection row.
         for (const p of catalogData.providers || []) {
           if (!p?.ready || !p.id || seen.has(p.id) || p.hidden) continue;
+          if (!(p.noAuth || (p.connected || 0) > 0)) continue;
           seen.add(p.id);
           connections.push({
             id: `catalog:${p.id}`,

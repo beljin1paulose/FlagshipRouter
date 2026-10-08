@@ -8,6 +8,7 @@ import CapacityBadges from "./CapacityBadges";
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
 import { getModelsByProviderId, getModelKind } from "@/shared/constants/models";
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, AI_PROVIDERS, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, getProviderAlias } from "@/shared/constants/providers";
+import { BRAND } from "open-sse/config/brand.js";
 
 // Provider order: OAuth first, then Free Tier, then API Key (matches dashboard/providers)
 const PROVIDER_ORDER = [
@@ -98,6 +99,7 @@ export default function ModelSelectModal({
   const [customModels, setCustomModels] = useState([]);
   const [disabledModels, setDisabledModels] = useState({});
   const [catalogProviders, setCatalogProviders] = useState([]);
+  const [catalogModels, setCatalogModels] = useState([]);
   // Cursor and Cline expose the usable catalog per account, so the static catalog is
   // kept only as a fallback: it goes stale quickly and entitlements differ per account.
   // Single map driven by LIVE_CATALOG_PROVIDERS so the constant cannot drift
@@ -188,9 +190,11 @@ export default function ModelSelectModal({
       if (!res.ok) throw new Error(`catalog ${res.status}`);
       const data = await res.json();
       setCatalogProviders(Array.isArray(data.providers) ? data.providers : []);
+      setCatalogModels(Array.isArray(data.models) ? data.models : []);
     } catch (error) {
       console.error("Error fetching model catalog:", error);
       setCatalogProviders([]);
+      setCatalogModels([]);
     }
   };
 
@@ -229,13 +233,12 @@ export default function ModelSelectModal({
       ? NO_AUTH_PROVIDER_IDS.filter((id) => (AI_PROVIDERS[id]?.serviceKinds || ["llm"]).includes(kindFilter))
       : NO_AUTH_PROVIDER_IDS;
 
-    // Same catalog the Models page uses: every allowed provider with models,
-    // not only saved connections. Without this, combo/CLI pickers stay empty
-    // when the user has no connection rows even though Models shows hundreds.
-    const catalogIds = catalogProviders
-      .filter((p) => p && !p.hidden && p.models > 0)
+    // Ready = saved connection OR no-auth (OpenCode Free, etc.). Never dump
+    // "Needs connect" catalog entries into combo/CLI pickers.
+    const readyCatalogIds = catalogProviders
+      .filter((p) => p && p.ready && !p.hidden && p.models > 0)
       .filter((p) => {
-        if (!kindFilter) return true;
+        if (!kindFilter) return (AI_PROVIDERS[p.id]?.serviceKinds || ["llm"]).includes("llm");
         return (AI_PROVIDERS[p.id]?.serviceKinds || ["llm"]).includes(kindFilter);
       })
       .map((p) => p.id);
@@ -243,7 +246,7 @@ export default function ModelSelectModal({
     const providerIdsToShow = new Set([
       ...activeConnectionIds,
       ...noAuthIds,
-      ...catalogIds,
+      ...readyCatalogIds,
     ]);
 
     // Sort by PROVIDER_ORDER
@@ -435,6 +438,25 @@ export default function ModelSelectModal({
       }
     });
 
+    // Public FlagshipRouter renames (e.g. GPT-6 Astra → oc/big-pickle) are ready
+    // whenever the upstream free provider is ready. They are not a saved connection.
+    if (!kindFilter) {
+      const renamed = catalogModels.filter((m) => m.source === "rename" && m.ready);
+      if (renamed.length > 0) {
+        groups[BRAND.slug] = {
+          name: BRAND.name,
+          alias: BRAND.slug,
+          color: "#6366f1",
+          models: renamed.map((m) => ({
+            id: m.modelId || m.id,
+            name: m.name,
+            value: m.id,
+            kind: "llm",
+          })),
+        };
+      }
+    }
+
     // Filter out disabled models per provider (disabled keyed by storage alias OR providerId)
     Object.entries(groups).forEach(([providerId, group]) => {
       const aliasKey = getProviderAlias(providerId);
@@ -448,7 +470,7 @@ export default function ModelSelectModal({
     });
 
     return groups;
-  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, cursorModels, clineModels, clinepassModels, catalogProviders]);
+  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, cursorModels, clineModels, clinepassModels, catalogProviders, catalogModels]);
 
   // Filter combos by search query (and hide combos when kindFilter is set — combos are LLM-only by design)
   const filteredCombos = useMemo(() => {
