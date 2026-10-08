@@ -1,14 +1,14 @@
 "use server";
 
 import { NextResponse } from "next/server";
+import { exec } from "child_process";
+import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { DEFAULT_PLUGINS } from "@/shared/constants/coworkPlugins";
-import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
-import { execCached } from "@/lib/execCache";
 
-const execAsync = (cmd, opts) => execCached(cmd, opts);
+const execAsync = promisify(exec);
 
 // Exa MCP def — reuse from coworkPlugins (DRY).
 const EXA_PLUGIN = DEFAULT_PLUGINS.find((p) => p.name === "exa");
@@ -108,7 +108,6 @@ export async function GET() {
       installed: true,
       settings: settings,
       hasRouter: hasRouter,
-      hasBackup: await hasToolBackup("claude"),
       exaMcpEnabled: !!claudeJson?.mcpServers?.exa,
       settingsPath: getClaudeSettingsPath(),
     });
@@ -135,12 +134,6 @@ export async function POST(request) {
 
     const settingsPath = getClaudeSettingsPath();
     const claudeDir = path.dirname(settingsPath);
-
-    // Backup original files before making changes
-    await backupToolFiles("claude", {
-      settings: settingsPath,
-      claudeJson: getClaudeJsonPath(),
-    });
 
     // Ensure .claude directory exists
     await fs.mkdir(claudeDir, { recursive: true });
@@ -219,19 +212,9 @@ const RESET_ENV_KEYS = [
   "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
 ];
 
-// DELETE - Restore original settings from backup or reset settings (remove env fields)
+// DELETE - Reset settings (remove env fields)
 export async function DELETE() {
   try {
-    // Attempt restoring original configuration from backup first
-    const backupResult = await restoreToolBackup("claude");
-    if (backupResult.restored) {
-      return NextResponse.json({
-        success: true,
-        message: "Original Claude Code configuration restored successfully",
-        restoredFromBackup: true,
-      });
-    }
-
     const settingsPath = getClaudeSettingsPath();
 
     // Read current settings

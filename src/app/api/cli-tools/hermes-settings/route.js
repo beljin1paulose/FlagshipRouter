@@ -2,14 +2,13 @@
 
 import { NextResponse } from "next/server";
 import { exec } from "child_process";
+import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { BRAND } from "open-sse/config/brand.js";
-import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
-import { execCached } from "@/lib/execCache";
 
-const execAsync = (cmd, opts) => execCached(cmd, opts);
+const execAsync = promisify(exec);
 
 const PROVIDER_NAME = BRAND.modelPrefix;
 const API_KEY_ENV = "OPENAI_API_KEY";
@@ -179,7 +178,6 @@ export async function GET() {
       installed: true,
       settings: { model, delegation, auxiliary },
       hasRouter: hasRouterConfig(model) || hasRouterConfig(delegation) || Object.values(auxiliary).some(hasRouterConfig),
-      hasBackup: await hasToolBackup("hermes"),
       configPath: getHermesConfigPath(),
     });
   } catch (error) {
@@ -202,15 +200,6 @@ export async function POST(request) {
     }
 
     const dir = getHermesDir();
-    const configPath = getHermesConfigPath();
-    const envPath = getHermesEnvPath();
-
-    // Backup original files before making changes
-    await backupToolFiles("hermes", {
-      config: configPath,
-      env: envPath,
-    });
-
     await fs.mkdir(dir, { recursive: true });
 
     const normalizedBaseUrl = baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`;
@@ -248,16 +237,6 @@ export async function POST(request) {
 
 export async function DELETE() {
   try {
-    // Attempt restoring original configuration from backup first
-    const backupResult = await restoreToolBackup("hermes");
-    if (backupResult.restored) {
-      return NextResponse.json({
-        success: true,
-        message: "Original Hermes configuration restored successfully",
-        restoredFromBackup: true,
-      });
-    }
-
     const configPath = getHermesConfigPath();
     let yaml = "";
     try {

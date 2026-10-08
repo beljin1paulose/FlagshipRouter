@@ -4,12 +4,12 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import { exec } from "child_process";
+import { promisify } from "util";
 import { parseTOML, stringifyTOML } from "confbox";
 import { BRAND } from "open-sse/config/brand.js";
-import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
-import { execCached } from "@/lib/execCache";
 
-const execAsync = (cmd, opts) => execCached(cmd, opts);
+const execAsync = promisify(exec);
 
 const getForgeDir = () => path.join(os.homedir(), ".forge");
 const getForgeConfigPath = () => path.join(getForgeDir(), "config.toml");
@@ -32,7 +32,7 @@ const checkForgeInstalled = async () => {
 
 const hasRouterConfig = (content) => {
   if (!content) return false;
-  return content.includes(`managed by ${BRAND.name}`) || content.includes("localhost:20120") || content.includes("localhost:20128");
+  return content.includes(`managed by ${BRAND.name}`) || content.includes("localhost:20128");
 };
 
 const readConfig = async () => {
@@ -64,7 +64,6 @@ export async function GET() {
       installed: true,
       config,
       hasRouter: hasRouterConfig(content),
-      hasBackup: await hasToolBackup("forge"),
       configPath: getForgeConfigPath(),
     });
   } catch (err) {
@@ -87,12 +86,6 @@ export async function POST(request) {
     }
 
     const configPath = getForgeConfigPath();
-
-    // Backup original files before making changes
-    await backupToolFiles("forge", {
-      config: configPath,
-    });
-
     await fs.mkdir(getForgeDir(), { recursive: true });
 
     let existing = {};
@@ -126,16 +119,6 @@ export async function POST(request) {
 
 export async function DELETE() {
   try {
-    // Attempt restoring original configuration from backup first
-    const backupResult = await restoreToolBackup("forge");
-    if (backupResult.restored) {
-      return NextResponse.json({
-        success: true,
-        message: "Original ForgeCode configuration restored successfully",
-        restoredFromBackup: true,
-      });
-    }
-
     const configPath = getForgeConfigPath();
     let existing = {};
     try {

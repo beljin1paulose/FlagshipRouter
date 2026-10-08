@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
+import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
 import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint } from "./cliEndpointPresets";
@@ -177,7 +177,7 @@ export default function GenericCliToolCard({
       const res = await fetch(endpointUrl, { method: "DELETE" });
       const data = await res.json();
       if (res.ok) {
-        setMessage({ type: "success", text: data.message || "Settings restored to default successfully." });
+        setMessage({ type: "success", text: data.message || "Settings removed successfully." });
         await checkStatus();
       } else {
         setMessage({ type: "error", text: data.error?.message || "Failed to reset settings." });
@@ -593,18 +593,16 @@ export default function GenericCliToolCard({
                   >
                     {applying ? "Applying..." : "Apply Settings"}
                   </Button>
-                  {(status?.hasRouter || status?.hasBackup) && (
-                    <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRestore}
-                        disabled={restoring || checking}
-                      >
-                        <span className="material-symbols-outlined text-[14px] mr-1">restore</span>
-                        {restoring ? "Restoring..." : "Restore to Default"}
-                      </Button>
-                    </Tooltip>
+                  {status?.hasRouter && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRestore}
+                      disabled={restoring || checking}
+                      className="text-red-500 hover:text-red-600 hover:border-red-500/50"
+                    >
+                      {restoring ? "Removing..." : "Remove from Tool"}
+                    </Button>
                   )}
                 </div>
                 <Button

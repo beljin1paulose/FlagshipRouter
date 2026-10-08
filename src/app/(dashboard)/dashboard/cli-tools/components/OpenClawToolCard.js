@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
+import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
 import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint } from "./cliEndpointPresets";
@@ -117,7 +117,7 @@ export default function OpenClawToolCard({
     if (typeof window !== "undefined") {
       return normalizeLocalhost(window.location.origin);
     }
-    return "http://127.0.0.1:20120";
+    return "http://127.0.0.1:20128";
   };
 
   const getEffectiveBaseUrl = () => {
@@ -171,7 +171,7 @@ export default function OpenClawToolCard({
       const res = await fetch("/api/cli-tools/openclaw-settings", { method: "DELETE" });
       const data = await res.json();
       if (res.ok) {
-        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
+        setMessage({ type: "success", text: "Settings reset successfully!" });
         setSelectedModel("");
         setSelectedApiKey("");
         checkOpenclawStatus();
@@ -361,11 +361,9 @@ export default function OpenClawToolCard({
                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!selectedModel} loading={applying}>
                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
                 </Button>
-                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
-                  <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!openclawStatus?.hasRouter && !openclawStatus?.hasBackup} loading={restoring}>
-                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
-                  </Button>
-                </Tooltip>
+                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!openclawStatus?.hasRouter} loading={restoring}>
+                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
