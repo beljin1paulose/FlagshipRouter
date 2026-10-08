@@ -280,6 +280,8 @@ export async function proxy(request) {
 
   if (pathname === "/login") { return NextResponse.redirect(new URL("/dashboard", request.url)); }
 
+  if (pathname === "/login") { return NextResponse.redirect(new URL("/dashboard", request.url)); }
+
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
