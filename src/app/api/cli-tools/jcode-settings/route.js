@@ -4,14 +4,14 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import { exec } from "child_process";
-import { promisify } from "util";
 import { parseTOML, stringifyTOML } from "confbox";
 import { BRAND } from "open-sse/config/brand.js";
+import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
+import { execCached } from "@/lib/execCache";
 
 const JCODE_API_KEY_ENV = `JCODE_${BRAND.slug.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`;
 
-const execAsync = promisify(exec);
+const execAsync = (cmd, opts) => execCached(cmd, opts);
 
 const getJcodeConfigDir = () => path.join(os.homedir(), ".jcode");
 const getConfigPath = () => path.join(getJcodeConfigDir(), "config.toml");
@@ -55,7 +55,7 @@ const hasRouterConfig = (config) => {
   if (providers[BRAND.modelPrefix]) return true;
 
   for (const [name, provider] of Object.entries(providers)) {
-    if (provider.base_url && provider.base_url.includes("localhost:20128")) {
+    if (provider.base_url && (provider.base_url.includes("localhost:20120") || provider.base_url.includes("localhost:20128"))) {
       return true;
     }
   }
@@ -127,6 +127,7 @@ export async function GET() {
     installed: true,
     config,
     hasRouter,
+    hasBackup: await hasToolBackup("jcode"),
     configPath: getConfigPath(),
   });
 }
@@ -141,6 +142,12 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+
+    // Backup original files before making changes
+    await backupToolFiles("jcode", {
+      config: getConfigPath(),
+      env: getProviderEnvPath(),
+    });
 
     const normalizedBaseUrl = baseUrl.endsWith("/v1")
       ? baseUrl
@@ -191,6 +198,16 @@ export async function POST(request) {
 
 export async function DELETE() {
   try {
+    // Attempt restoring original configuration from backup first
+    const backupResult = await restoreToolBackup("jcode");
+    if (backupResult.restored) {
+      return NextResponse.json({
+        success: true,
+        message: "Original jcode configuration restored successfully",
+        restoredFromBackup: true,
+      });
+    }
+
     const config = await readConfig();
 
     if (!config.providers) {

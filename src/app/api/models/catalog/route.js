@@ -87,7 +87,28 @@ function providerSummary(entry, connectedCount) {
   };
 }
 
+// Response cache: building the catalog walks the whole registry and may hit
+// live model-list fetchers; the Models page re-fetches on every visit. Serve
+// a cached body for a short window and collapse concurrent builders into one.
+const CATALOG_TTL_MS = 15_000;
+let catalogCache = { at: 0, body: null };
+let catalogInflight = null;
+
 export async function GET() {
+  if (catalogCache.body && Date.now() - catalogCache.at < CATALOG_TTL_MS) {
+    return NextResponse.json(catalogCache.body);
+  }
+  if (catalogInflight) return NextResponse.json(await catalogInflight);
+  catalogInflight = buildCatalog()
+    .then((body) => {
+      if (!body?.error) catalogCache = { at: Date.now(), body };
+      return body;
+    })
+    .finally(() => { catalogInflight = null; });
+  return NextResponse.json(await catalogInflight);
+}
+
+async function buildCatalog() {
   try {
     const [connections, disabledByAlias] = await Promise.all([
       getProviderConnections().catch(() => []),
@@ -166,13 +187,13 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({
+    return {
       brand: { name: BRAND.name, modelPrefix: BRAND.modelPrefix },
       providers,
       models: [...renamed, ...models],
-    });
+    };
   } catch (error) {
     console.log("Error building model catalog:", error);
-    return NextResponse.json({ error: "Failed to build model catalog" }, { status: 500 });
+    return { error: "Failed to build model catalog" };
   }
 }

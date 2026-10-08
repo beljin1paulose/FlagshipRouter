@@ -1,8 +1,6 @@
 "use server";
 
 import { NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -14,8 +12,10 @@ import {
   resetGrokBuildConfig,
 } from "@/lib/grokBuildConfig";
 import { BRAND } from "open-sse/config/brand.js";
+import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
+import { execCached } from "@/lib/execCache";
 
-const execAsync = promisify(exec);
+const execAsync = (cmd, opts) => execCached(cmd, opts);
 
 const getGrokDir = () => path.join(os.homedir(), ".grok");
 const getGrokConfigPath = () => path.join(getGrokDir(), "config.toml");
@@ -89,6 +89,7 @@ export async function GET() {
       installed: true,
       settings,
       hasRouter: hasRouterConfig(settings),
+      hasBackup: await hasToolBackup("grok-build"),
       configPath: getGrokConfigPath(),
     });
   } catch (error) {
@@ -104,6 +105,13 @@ export async function POST(request) {
     if (!baseUrl || !selectedModel) {
       return NextResponse.json({ error: "baseUrl and model are required" }, { status: 400 });
     }
+
+    const configPath = getGrokConfigPath();
+
+    // Backup original files before making changes
+    await backupToolFiles("grok-build", {
+      config: configPath,
+    });
 
     await fs.mkdir(getGrokDir(), { recursive: true });
     const normalizedBaseUrl = baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`;
@@ -130,6 +138,16 @@ export async function POST(request) {
 
 export async function DELETE() {
   try {
+    // Attempt restoring original configuration from backup first
+    const backupResult = await restoreToolBackup("grok-build");
+    if (backupResult.restored) {
+      return NextResponse.json({
+        success: true,
+        message: "Original Grok Build configuration restored successfully",
+        restoredFromBackup: true,
+      });
+    }
+
     const configPath = getGrokConfigPath();
     let toml;
     try {

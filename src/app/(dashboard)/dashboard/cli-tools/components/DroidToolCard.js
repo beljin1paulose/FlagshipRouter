@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
 import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint } from "./cliEndpointPresets";
@@ -179,7 +179,7 @@ export default function DroidToolCard({
       const res = await fetch("/api/cli-tools/droid-settings", { method: "DELETE" });
       const data = await res.json();
       if (res.ok) {
-        setMessage({ type: "success", text: "Settings reset successfully!" });
+        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
         setModelList([]);
         checkDroidStatus();
       } else {
@@ -383,9 +383,11 @@ export default function DroidToolCard({
                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={modelList.length === 0} loading={applying}>
                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!droidStatus?.hasRouter} loading={restoring}>
-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                </Button>
+                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+                  <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!droidStatus?.hasRouter && !droidStatus?.hasBackup} loading={restoring}>
+                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+                  </Button>
+                </Tooltip>
                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>

@@ -4,11 +4,11 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import { exec } from "child_process";
-import { promisify } from "util";
 import { BRAND } from "open-sse/config/brand.js";
+import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
+import { execCached } from "@/lib/execCache";
 
-const execAsync = promisify(exec);
+const execAsync = (cmd, opts) => execCached(cmd, opts);
 
 const getPiModelsJsonPath = () => {
   const agentPath = path.join(os.homedir(), ".pi", "agent", "models.json");
@@ -43,7 +43,7 @@ const hasRouterConfig = (settings) => {
   const p = settings.providers[BRAND.modelPrefix];
   if (p && p.baseUrl) return true;
   for (const prov of Object.values(settings.providers)) {
-    if (prov.baseUrl && prov.baseUrl.includes("20128")) return true;
+    if (prov.baseUrl && (prov.baseUrl.includes("20120") || prov.baseUrl.includes("20128"))) return true;
   }
   return false;
 };
@@ -92,6 +92,7 @@ export async function GET() {
       installed: true,
       config,
       hasRouter: hasRouterConfig(config),
+      hasBackup: await hasToolBackup("pi"),
       configPath,
     });
   } catch (err) {
@@ -114,6 +115,12 @@ export async function POST(request) {
     }
 
     const configPath = await resolveModelsJsonPath();
+
+    // Backup original files before making changes
+    await backupToolFiles("pi", {
+      config: configPath,
+    });
+
     await fs.mkdir(path.dirname(configPath), { recursive: true });
 
     let existing = {};
@@ -166,6 +173,16 @@ export async function POST(request) {
 
 export async function DELETE() {
   try {
+    // Attempt restoring original configuration from backup first
+    const backupResult = await restoreToolBackup("pi");
+    if (backupResult.restored) {
+      return NextResponse.json({
+        success: true,
+        message: "Original Pi configuration restored successfully",
+        restoredFromBackup: true,
+      });
+    }
+
     const configPath = await resolveModelsJsonPath();
     let existing = {};
     try {
