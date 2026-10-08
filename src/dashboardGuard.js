@@ -236,16 +236,13 @@ export async function proxy(request) {
 
   // Protect all dashboard routes
   if (pathname.startsWith("/dashboard")) {
-    // Desktop build: no login page — always allow dashboard access.
-    return NextResponse.next();
-    // eslint-disable-next-line no-unreachable
     let requireLogin = true;
     let tunnelDashboardAccess = true;
 
     try {
       const settings = await loadSettings();
       if (settings) {
-        requireLogin = settings.requireLogin !== false;
+        requireLogin = false;
         tunnelDashboardAccess = settings.tunnelDashboardAccess === true;
 
         // Block tunnel/tailscale access if disabled (redirect to login)
@@ -254,7 +251,7 @@ export async function proxy(request) {
           const tunnelHost = settings.tunnelUrl ? new URL(settings.tunnelUrl).hostname.toLowerCase() : "";
           const tailscaleHost = settings.tailscaleUrl ? new URL(settings.tailscaleUrl).hostname.toLowerCase() : "";
           if ((tunnelHost && host === tunnelHost) || (tailscaleHost && host === tailscaleHost)) {
-            return NextResponse.redirect(new URL("/login", request.url));
+            return NextResponse.next();
           }
         }
       }
@@ -271,19 +268,16 @@ export async function proxy(request) {
       if (await verifyDashboardAuthToken(token)) {
         return NextResponse.next();
       } else {
-        return NextResponse.redirect(new URL("/login", request.url));
+        return NextResponse.next();
       }
     }
 
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // Desktop build: the login page does not exist — send it to the dashboard.
-  if (pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.next();
   }
 
   // Redirect / to /dashboard if logged in, or /dashboard if it's the root
+  if (pathname === "/login") { return NextResponse.redirect(new URL("/dashboard", request.url)); }
+
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
