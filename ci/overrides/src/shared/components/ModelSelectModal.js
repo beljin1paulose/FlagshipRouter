@@ -100,6 +100,7 @@ export default function ModelSelectModal({
   const [disabledModels, setDisabledModels] = useState({});
   const [catalogProviders, setCatalogProviders] = useState([]);
   const [catalogModels, setCatalogModels] = useState([]);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
   // Cursor and Cline expose the usable catalog per account, so the static catalog is
   // kept only as a fallback: it goes stale quickly and entitlements differ per account.
   // Single map driven by LIVE_CATALOG_PROVIDERS so the constant cannot drift
@@ -195,11 +196,15 @@ export default function ModelSelectModal({
       console.error("Error fetching model catalog:", error);
       setCatalogProviders([]);
       setCatalogModels([]);
+    } finally {
+      setCatalogLoaded(true);
     }
   };
 
   useEffect(() => {
-    if (isOpen) fetchCatalogProviders();
+    if (!isOpen) return;
+    setCatalogLoaded(false);
+    fetchCatalogProviders();
   }, [isOpen]);
 
   const allProviders = useMemo(() => ({ ...OAUTH_PROVIDERS, ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...APIKEY_PROVIDERS }), []);
@@ -314,7 +319,12 @@ export default function ModelSelectModal({
             .filter((m) => !getModelKind(m) || getModelKind(m) === "llm")
             .map((m) => ({ id: m.id, name: m.name, value: `${alias}/${m.id}`, kind: getModelKind(m) }))
             .filter((m) => !seen.has(m.value));
-          combined = [...registeredLlms, ...aliasModels.filter((m) => !registeredLlms.some((registered) => registered.value === m.value)), ...hardcoded];
+          for (const m of hardcoded) seen.add(m.value);
+          const liveCatalog = catalogModels
+            .filter((m) => (m.providerId === providerId || m.providerAlias === alias) && m.ready && m.kind !== "systemone" && (!m.kind || m.kind === "llm"))
+            .map((m) => ({ id: m.modelId, name: m.name, value: m.id, kind: m.kind || "llm" }))
+            .filter((m) => !seen.has(m.value));
+          combined = [...registeredLlms, ...aliasModels.filter((m) => !registeredLlms.some((registered) => registered.value === m.value)), ...hardcoded, ...liveCatalog];
         }
 
         if (combined.length > 0) {
@@ -405,8 +415,12 @@ export default function ModelSelectModal({
           .filter((m) => m.providerAlias === alias && !hardcodedIds.has(m.id) && !customAliasIds.has(m.id))
           .map((m) => ({ id: m.id, name: m.name || m.id, value: `${alias}/${m.id}`, isCustom: true }));
 
+        const liveCatalog = catalogModels
+          .filter((m) => (m.providerId === providerId || m.providerAlias === alias) && m.ready && (!kindFilter ? (!m.kind || m.kind === "llm") : m.kind === kindFilter))
+          .map((m) => ({ id: m.modelId, name: m.name, value: m.id, kind: m.kind || "llm" }));
         const merged = [
           ...hardcodedModels.map((m) => ({ id: m.id, name: m.name, value: `${alias}/${m.id}`, kind: getModelKind(m) })),
+          ...liveCatalog,
           ...customAliasModels,
           ...customRegisteredModels,
         ];
@@ -678,9 +692,9 @@ export default function ModelSelectModal({
         {Object.keys(filteredGroups).length === 0 && filteredCombos.length === 0 && (
           <div className="text-center py-4 text-text-muted">
             <span className="material-symbols-outlined text-2xl mb-1 block">
-              search_off
+              {catalogLoaded ? "search_off" : "progress_activity"}
             </span>
-            <p className="text-xs">No models found</p>
+            <p className="text-xs">{catalogLoaded ? "No models found" : "Loading models…"}</p>
           </div>
         )}
       </div>
