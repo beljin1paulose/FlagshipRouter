@@ -17,20 +17,23 @@ const buildOptions = ({ requiresExternalUrl, tunnelEnabled, tunnelPublicUrl, tai
   const opts = [];
   const wrap = (url) => (withV1 ? ensureV1(url) : (url || "").replace(/\/+$/, ""));
   if (!requiresExternalUrl) {
-    const localUrl = wrap(`http://127.0.0.1:${UPDATER_CONFIG.appPort}`);
-    opts.push({ value: "local", label: localUrl, url: localUrl });
+    const origin = (typeof window !== "undefined" && window.location?.origin)
+      ? window.location.origin
+      : `http://localhost:${UPDATER_CONFIG.appPort}`;
+    const localUrl = wrap(origin);
+    opts.push({ value: "local", label: `Local — ${localUrl}`, url: localUrl });
   }
   if (tunnelEnabled && tunnelPublicUrl) {
     const u = wrap(tunnelPublicUrl);
-    opts.push({ value: "tunnel", label: u, url: u });
+    opts.push({ value: "tunnel", label: `Tunnel — ${u}`, url: u });
   }
   if (tailscaleEnabled && tailscaleUrl) {
     const u = wrap(tailscaleUrl);
-    opts.push({ value: "tailscale", label: u, url: u });
+    opts.push({ value: "tailscale", label: `Tailscale — ${u}`, url: u });
   }
   if (cloudEnabled && cloudUrl) {
     const u = wrap(cloudUrl);
-    opts.push({ value: "cloud", label: u, url: u });
+    opts.push({ value: "cloud", label: `Cloud — ${u}`, url: u });
   }
   savedPresets.forEach((p) => {
     opts.push({ value: `saved:${p.name}`, label: p.baseUrl, url: p.baseUrl, saved: true });
@@ -108,7 +111,7 @@ export default function BaseUrlSelect({
       setMode(CUSTOM_VALUE);
       onChange(current);
     } else {
-      const target = options.find((o) => o.value !== CUSTOM_VALUE);
+      const target = options.find((o) => o.value === "local") || options.find((o) => o.value !== CUSTOM_VALUE);
       if (!target) return;
       setMode(target.value);
       onChange(target.url);

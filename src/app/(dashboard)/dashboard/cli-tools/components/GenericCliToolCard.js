@@ -501,7 +501,6 @@ export default function GenericCliToolCard({
                           size="sm"
                           variant="secondary"
                           onClick={() => setModalOpen(true)}
-                          disabled={!activeProviders?.length}
                         >
                           <span className="material-symbols-outlined text-[14px] mr-1">add</span>
                           Add Model
@@ -556,12 +555,7 @@ export default function GenericCliToolCard({
                     </div>
                     <button
                       onClick={() => setModalOpen(true)}
-                      disabled={!activeProviders?.length}
-                      className={`w-full sm:w-auto rounded border px-2 py-2 text-xs transition-colors sm:py-1.5 whitespace-nowrap sm:shrink-0 ${
-                        activeProviders?.length
-                          ? "bg-surface border-border text-text-main hover:border-primary cursor-pointer"
-                          : "opacity-50 cursor-not-allowed border-border"
-                      }`}
+                      className="w-full sm:w-auto rounded border px-2 py-2 text-xs transition-colors sm:py-1.5 whitespace-nowrap sm:shrink-0 bg-surface border-border text-text-main hover:border-primary cursor-pointer"
                     >
                       Select Model
                     </button>

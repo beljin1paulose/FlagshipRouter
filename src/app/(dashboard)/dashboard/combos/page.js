@@ -156,19 +156,35 @@ export default function CombosPage() {
 
   const fetchData = async () => {
     try {
-      const [combosRes, providersRes, settingsRes] = await Promise.all([
+      const [combosRes, providersRes, settingsRes, catalogRes] = await Promise.all([
         fetch("/api/combos"),
         fetch("/api/providers"),
         fetch("/api/settings"),
+        fetch("/api/models/catalog"),
       ]);
       const combosData = await combosRes.json();
       const providersData = await providersRes.json();
       const settingsData = settingsRes.ok ? await settingsRes.json() : {};
+      const catalogData = catalogRes.ok ? await catalogRes.json() : {};
 
       // Only LLM combos here - webSearch/webFetch combos belong to media-providers/web
       if (combosRes.ok) setCombos((combosData.combos || []).filter(c => !c.kind || c.kind === "llm"));
       if (providersRes.ok) {
-        setActiveProviders(providersData.connections || []);
+        const connections = providersData.connections || [];
+        const seen = new Set(connections.map((c) => c.provider));
+        // Catalog-ready (no-auth / already connected) providers must appear in
+        // the combo picker even when the user has not saved a connection row.
+        for (const p of catalogData.providers || []) {
+          if (!p?.ready || !p.id || seen.has(p.id) || p.hidden) continue;
+          seen.add(p.id);
+          connections.push({
+            id: `catalog:${p.id}`,
+            provider: p.id,
+            name: p.name || p.id,
+            isActive: true,
+          });
+        }
+        setActiveProviders(connections);
       }
       setComboStrategies(settingsData.comboStrategies || {});
       const rawAdapter = settingsData.capacityAdapter || {};
