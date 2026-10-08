@@ -278,6 +278,11 @@ export async function proxy(request) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  // Desktop build: the login page does not exist — send it to the dashboard.
+  if (pathname === "/login") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   // Redirect / to /dashboard if logged in, or /dashboard if it's the root
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
