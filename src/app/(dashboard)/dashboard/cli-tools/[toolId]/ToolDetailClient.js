@@ -30,30 +30,16 @@ export default function ToolDetailClient({ toolId, machineId }) {
     let mounted = true;
     (async () => {
       try {
-        const [provRes, settingsRes, tunnelRes, keysRes, catalogRes] = await Promise.all([
+        const [provRes, settingsRes, tunnelRes, keysRes] = await Promise.all([
           fetch("/api/providers"),
           fetch("/api/settings"),
           fetch("/api/tunnel/status"),
           fetch("/api/keys"),
-          fetch("/api/models/catalog"),
         ]);
         if (!mounted) return;
         if (provRes.ok) {
           const data = await provRes.json();
-          const connections = data.connections || [];
-          const catalog = catalogRes.ok ? await catalogRes.json() : {};
-          const seen = new Set(connections.map((c) => c.provider));
-          for (const p of catalog.providers || []) {
-            if (!p?.ready || !p.id || seen.has(p.id) || p.hidden) continue;
-            seen.add(p.id);
-            connections.push({
-              id: `catalog:${p.id}`,
-              provider: p.id,
-              name: p.name || p.id,
-              isActive: true,
-            });
-          }
-          setConnections(connections);
+          setConnections(data.connections || []);
         }
         if (settingsRes.ok) {
           const data = await settingsRes.json();
@@ -133,11 +119,11 @@ export default function ToolDetailClient({ toolId, machineId }) {
     });
   }, []);
 
-  // Desktop default is always the local router. Tunnel/cloud stay available in
-  // the endpoint dropdown — they must not auto-replace localhost.
   const getBaseUrl = () => {
+    if (tunnelEnabled && tunnelPublicUrl) return tunnelPublicUrl;
+    if (cloudEnabled && CLOUD_URL) return CLOUD_URL;
     if (typeof window !== "undefined") return window.location.origin;
-    return "http://localhost:20120";
+    return "http://localhost:20128";
   };
 
   const renderToolCard = () => {
