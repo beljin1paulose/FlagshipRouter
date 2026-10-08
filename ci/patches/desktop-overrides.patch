@@ -1,3 +1,1751 @@
+diff --git a/.github/workflows/upstream-build.yml b/.github/workflows/upstream-build.yml
+index 8349b2f..e5c6cf1 100644
+Binary files a/.github/workflows/upstream-build.yml and b/.github/workflows/upstream-build.yml differ
+diff --git a/ci/patches/desktop-overrides.patch b/ci/patches/desktop-overrides.patch
+new file mode 100644
+index 0000000..4d281b8
+--- /dev/null
++++ b/ci/patches/desktop-overrides.patch
+@@ -0,0 +1,1651 @@
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js b/src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js
++index f5df083..6bacfe4 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js
++@@ -123,7 +123,7 @@ export default function ToolDetailClient({ toolId, machineId }) {
++     if (tunnelEnabled && tunnelPublicUrl) return tunnelPublicUrl;
++     if (cloudEnabled && CLOUD_URL) return CLOUD_URL;
++     if (typeof window !== "undefined") return window.location.origin;
++-    return "http://localhost:20128";
+++    return "http://localhost:20120";
++   };
++ 
++   const renderToolCard = () => {
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/ClaudeToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/ClaudeToolCard.js
++index 8c854f6..5c40c1c 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/ClaudeToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/ClaudeToolCard.js
++@@ -249,12 +249,13 @@ export default function ClaudeToolCard({
++       const res = await fetch("/api/cli-tools/claude-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         tool.defaultModels.forEach((model) => onModelMappingChange(model.alias, model.defaultValue || ""));
++         setSelectedApiKey("");
++         setExaMcpEnabled(false);
++         setAutoCompactWindow("");
++         setOneMContext(false);
+++        await checkClaudeStatus();
++       } else {
++         setMessage({ type: "error", text: data.error || "Failed to reset settings" });
++       }
++@@ -473,9 +474,11 @@ export default function ClaudeToolCard({
++                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!hasActiveProviders} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!claudeStatus?.hasRouter} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!claudeStatus?.hasRouter && !claudeStatus?.hasBackup} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/ClineToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/ClineToolCard.js
++index 38ec392..806ed78 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/ClineToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/ClineToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -119,7 +119,7 @@ export default function ClineToolCard({ tool, isExpanded, onToggle, baseUrl, api
++       const res = await fetch("/api/cli-tools/cline-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         checkStatus();
++       } else {
++@@ -274,9 +274,11 @@ export default function ClineToolCard({ tool, isExpanded, onToggle, baseUrl, api
++                 <Button variant="primary" size="sm" onClick={handleApply} disabled={(!selectedApiKey && (cloudEnabled && apiKeys.length > 0)) || !selectedModel} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleReset} disabled={restoring} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleReset} disabled={restoring || (!status?.hasRouter && !status?.hasBackup)} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js
++index b68f9c1..3cfa5ba 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/CodexToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import ProviderIcon from "@/shared/components/ProviderIcon";
++ import BaseUrlSelect from "./BaseUrlSelect";
++@@ -233,7 +233,7 @@ export default function CodexToolCard({ tool, isExpanded, onToggle, baseUrl, api
++       const res = await fetch("/api/cli-tools/codex-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         setSubagentModel("");
++         checkCodexStatus();
++@@ -451,9 +451,11 @@ default_subagent_model = "${effectiveSubagentModel}"
++                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={(!selectedApiKey && (cloudEnabled && apiKeys.length > 0)) || !selectedModel} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={restoring} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={restoring || (!codexStatus?.hasRouter && !codexStatus?.hasBackup)} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/CopilotToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/CopilotToolCard.js
++index c3b3bb2..d75f9cb 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/CopilotToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/CopilotToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect, useRef } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -148,7 +148,7 @@ export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, a
++       const res = await fetch("/api/cli-tools/copilot-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModels([]);
++         checkStatus();
++       } else {
++@@ -284,9 +284,11 @@ export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, a
++                 <Button variant="primary" size="sm" onClick={handleApply} disabled={selectedModels.length === 0} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!status?.hasRouter} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleReset} disabled={!status?.hasRouter && !status?.hasBackup} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} disabled={selectedModels.length === 0}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/CoworkToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/CoworkToolCard.js
++index eaa6511..08b676d 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/CoworkToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/CoworkToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect } from "react";
++-import { Card, Button, ManualConfigModal, ComboFormModal, McpMarketplaceModal, ModelSelectModal } from "@/shared/components";
+++import { Card, Button, ManualConfigModal, ComboFormModal, McpMarketplaceModal, ModelSelectModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -206,7 +206,7 @@ export default function CoworkToolCard({
++       const res = await fetch(ENDPOINT, { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModels([]);
++         setPlugins(status?.defaultPlugins || []);
++         setLocalPlugins([]);
++@@ -502,9 +502,11 @@ export default function CoworkToolCard({
++                 <Button variant="primary" size="sm" onClick={handleApply} disabled={selectedModels.length === 0} loading={applying} className="w-full sm:w-auto">
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!status.hasRouter} loading={restoring} className="w-full sm:w-auto">
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleReset} disabled={!status?.hasRouter && !status?.hasBackup} loading={restoring} className="w-full sm:w-auto">
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className="w-full sm:w-auto">
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js
++index 268bc9a..a7d41fe 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/DeepSeekTuiToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect, useRef } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -105,7 +105,7 @@ export default function DeepSeekTuiToolCard({
++     if (typeof window !== "undefined") {
++       return normalizeLocalhost(window.location.origin);
++     }
++-    return "http://127.0.0.1:20128";
+++    return "http://127.0.0.1:20120";
++   };
++ 
++   const getEffectiveBaseUrl = () => {
++@@ -153,7 +153,7 @@ export default function DeepSeekTuiToolCard({
++       const res = await fetch(ENDPOINT, { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         checkStatus();
++       } else {
++@@ -311,9 +311,11 @@ model = "${selectedModel || "provider/model-id"}"
++                 <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!deepseekStatus?.hasRouter} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleReset} disabled={!deepseekStatus?.hasRouter && !deepseekStatus?.hasBackup} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js
++index 2544e9f..36090a9 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/DefaultToolCard.js
++@@ -24,7 +24,7 @@ export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, ba
++       : (!cloudEnabled ? `sk_${BRAND.modelPrefix}` : "your-api-key");
++     
++     // Add /v1 suffix only if not already present (DRY - avoid duplicate)
++-    const normalizedBaseUrl = baseUrl || "http://localhost:20128";
+++    const normalizedBaseUrl = baseUrl || "http://localhost:20120";
++     const baseUrlWithV1 = normalizedBaseUrl.endsWith("/v1") 
++       ? normalizedBaseUrl 
++       : `${normalizedBaseUrl}/v1`;
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/DroidToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/DroidToolCard.js
++index 97fe513..096ebcd 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/DroidToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/DroidToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect, useRef } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -179,7 +179,7 @@ export default function DroidToolCard({
++       const res = await fetch("/api/cli-tools/droid-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setModelList([]);
++         checkDroidStatus();
++       } else {
++@@ -383,9 +383,11 @@ export default function DroidToolCard({
++                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={modelList.length === 0} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!droidStatus?.hasRouter} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!droidStatus?.hasRouter && !droidStatus?.hasBackup} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/GenericCliToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/GenericCliToolCard.js
++index 5b1060d..278884b 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/GenericCliToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/GenericCliToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -177,7 +177,7 @@ export default function GenericCliToolCard({
++       const res = await fetch(endpointUrl, { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: data.message || "Settings removed successfully." });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully." });
++         await checkStatus();
++       } else {
++         setMessage({ type: "error", text: data.error?.message || "Failed to reset settings." });
++@@ -593,16 +593,18 @@ export default function GenericCliToolCard({
++                   >
++                     {applying ? "Applying..." : "Apply Settings"}
++                   </Button>
++-                  {status?.hasRouter && (
++-                    <Button
++-                      variant="outline"
++-                      size="sm"
++-                      onClick={handleRestore}
++-                      disabled={restoring || checking}
++-                      className="text-red-500 hover:text-red-600 hover:border-red-500/50"
++-                    >
++-                      {restoring ? "Removing..." : "Remove from Tool"}
++-                    </Button>
+++                  {(status?.hasRouter || status?.hasBackup) && (
+++                    <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                      <Button
+++                        variant="outline"
+++                        size="sm"
+++                        onClick={handleRestore}
+++                        disabled={restoring || checking}
+++                      >
+++                        <span className="material-symbols-outlined text-[14px] mr-1">restore</span>
+++                        {restoring ? "Restoring..." : "Restore to Default"}
+++                      </Button>
+++                    </Tooltip>
++                   )}
++                 </div>
++                 <Button
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/GrokBuildToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/GrokBuildToolCard.js
++index 7323ddc..75958f9 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/GrokBuildToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/GrokBuildToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect, useRef, useCallback } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import { useModelCaps } from "@/shared/hooks/useModelCaps";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++@@ -157,7 +157,7 @@ export default function GrokBuildToolCard({
++   const getEffectiveBaseUrl = () => {
++     const url = customBaseUrl || (typeof window !== "undefined"
++       ? window.location.origin.replace("://localhost", "://127.0.0.1")
++-      : "http://127.0.0.1:20128");
+++      : "http://127.0.0.1:20120");
++     return url.endsWith("/v1") ? url : `${url}/v1`;
++   };
++ 
++@@ -208,7 +208,7 @@ export default function GrokBuildToolCard({
++       const res = await fetch(ENDPOINT, { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         setSubagentModels({});
++         checkStatus();
++@@ -362,7 +362,9 @@ export default function GrokBuildToolCard({
++ 
++               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
++                 <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying} className="w-full sm:w-auto"><span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply</Button>
++-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!grokStatus?.hasRouter} loading={restoring} className="w-full sm:w-auto"><span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset</Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleReset} disabled={!grokStatus?.hasRouter && !grokStatus?.hasBackup} loading={restoring} className="w-full sm:w-auto"><span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default</Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className="w-full sm:w-auto"><span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config</Button>
++               </div>
++             </>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js
++index 2ffe41e..08b1dfd 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/HermesToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect, useRef } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -115,7 +115,7 @@ export default function HermesToolCard({
++     if (typeof window !== "undefined") {
++       return normalizeLocalhost(window.location.origin);
++     }
++-    return "http://127.0.0.1:20128";
+++    return "http://127.0.0.1:20120";
++   };
++ 
++   const getEffectiveBaseUrl = () => {
++@@ -168,7 +168,7 @@ export default function HermesToolCard({
++       const res = await fetch(ENDPOINT, { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         setRoleModels({});
++         checkStatus();
++@@ -366,9 +366,11 @@ export default function HermesToolCard({
++                 <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying} className="w-full sm:w-auto">
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!hermesStatus?.hasRouter} loading={restoring} className="w-full sm:w-auto">
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleReset} disabled={!hermesStatus?.hasRouter && !hermesStatus?.hasBackup} loading={restoring} className="w-full sm:w-auto">
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className="w-full sm:w-auto">
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js
++index a60a51f..37433ce 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/JcodeToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect, useRef } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -112,7 +112,7 @@ export default function JcodeToolCard({
++     if (typeof window !== "undefined") {
++       return normalizeLocalhost(window.location.origin);
++     }
++-    return "http://127.0.0.1:20128";
+++    return "http://127.0.0.1:20120";
++   };
++ 
++   const getEffectiveBaseUrl = () => {
++@@ -165,7 +165,7 @@ export default function JcodeToolCard({
++       const res = await fetch("/api/cli-tools/jcode-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         setSelectedApiKey("");
++         checkJcodeStatus();
++@@ -353,9 +353,11 @@ id = "${selectedModel || "cc/claude-opus-4-7"}"`;
++                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!selectedModel} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!jcodeStatus?.hasRouter} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!jcodeStatus?.hasRouter && !jcodeStatus?.hasBackup} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/KiloToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/KiloToolCard.js
++index 2fdd0cc..06295f2 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/KiloToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/KiloToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -111,7 +111,7 @@ export default function KiloToolCard({ tool, isExpanded, onToggle, baseUrl, apiK
++       const res = await fetch("/api/cli-tools/kilo-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         checkStatus();
++       } else {
++@@ -245,9 +245,11 @@ export default function KiloToolCard({ tool, isExpanded, onToggle, baseUrl, apiK
++                 <Button variant="primary" size="sm" onClick={handleApply} disabled={(!selectedApiKey && (cloudEnabled && apiKeys.length > 0)) || !selectedModel} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleReset} disabled={restoring} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleReset} disabled={restoring || (!status?.hasRouter && !status?.hasBackup)} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/MitmServerCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/MitmServerCard.js
++index 1a04e7b..d95d39a 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/MitmServerCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/MitmServerCard.js
++@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
++ import { Card, Button, Badge, Input } from "@/shared/components";
++ import { BRAND } from "open-sse/config/brand.js";
++ 
++-const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20128";
+++const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20120";
++ 
++ /**
++  * Shared MITM infrastructure card — manages SSL cert + server start/stop.
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js
++index 33e64d7..32d570a 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/OpenClawToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect, useRef } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -117,7 +117,7 @@ export default function OpenClawToolCard({
++     if (typeof window !== "undefined") {
++       return normalizeLocalhost(window.location.origin);
++     }
++-    return "http://127.0.0.1:20128";
+++    return "http://127.0.0.1:20120";
++   };
++ 
++   const getEffectiveBaseUrl = () => {
++@@ -171,7 +171,7 @@ export default function OpenClawToolCard({
++       const res = await fetch("/api/cli-tools/openclaw-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         setSelectedApiKey("");
++         checkOpenclawStatus();
++@@ -361,9 +361,11 @@ export default function OpenClawToolCard({
++                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!selectedModel} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!openclawStatus?.hasRouter} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!openclawStatus?.hasRouter && !openclawStatus?.hasBackup} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/(dashboard)/dashboard/cli-tools/components/OpenCodeToolCard.js b/src/app/(dashboard)/dashboard/cli-tools/components/OpenCodeToolCard.js
++index 2e76a05..65e66de 100644
++--- a/src/app/(dashboard)/dashboard/cli-tools/components/OpenCodeToolCard.js
+++++ b/src/app/(dashboard)/dashboard/cli-tools/components/OpenCodeToolCard.js
++@@ -1,7 +1,7 @@
++ "use client";
++ 
++ import { useState, useEffect, useRef } from "react";
++-import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
+++import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
++ import Image from "next/image";
++ import BaseUrlSelect from "./BaseUrlSelect";
++ import { rememberEndpoint } from "./cliEndpointPresets";
++@@ -170,7 +170,7 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl,
++       const res = await fetch("/api/cli-tools/opencode-settings", { method: "DELETE" });
++       const data = await res.json();
++       if (res.ok) {
++-        setMessage({ type: "success", text: "Settings reset successfully!" });
+++        setMessage({ type: "success", text: data.message || "Settings restored to default successfully!" });
++         setSelectedModel("");
++         setSubagentModel("");
++         setSelectedModels([]);
++@@ -446,9 +446,11 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl,
++                 <Button variant="primary" size="sm" onClick={handleApply} disabled={selectedModels.length === 0} loading={applying}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
++                 </Button>
++-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!status.hasRouter} loading={restoring}>
++-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
++-                </Button>
+++                <Tooltip text={"Undo all changes: puts this tool's settings back to exactly how they were before FlagshipRouter modified them (restored from a safety backup)."}>
+++                  <Button variant="outline" size="sm" onClick={handleReset} disabled={!status?.hasRouter && !status?.hasBackup} loading={restoring}>
+++                    <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Restore to Default
+++                  </Button>
+++                </Tooltip>
++                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
++                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
++                 </Button>
++diff --git a/src/app/api/cli-tools/antigravity-mitm/route.js b/src/app/api/cli-tools/antigravity-mitm/route.js
++index 3729638..3a25a09 100644
++--- a/src/app/api/cli-tools/antigravity-mitm/route.js
+++++ b/src/app/api/cli-tools/antigravity-mitm/route.js
++@@ -17,7 +17,7 @@ import { BRAND } from "open-sse/config/brand.js";
++ 
++ initDbHooks(getSettings, updateSettings);
++ 
++-const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20128";
+++const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20120";
++ 
++ function normalizeMitmRouterBaseUrlInput(input) {
++   if (input == null || String(input).trim() === "") {
++diff --git a/src/app/api/cli-tools/claude-settings/route.js b/src/app/api/cli-tools/claude-settings/route.js
++index 757aed8..3342c92 100644
++--- a/src/app/api/cli-tools/claude-settings/route.js
+++++ b/src/app/api/cli-tools/claude-settings/route.js
++@@ -7,6 +7,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { DEFAULT_PLUGINS } from "@/shared/constants/coworkPlugins";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -108,6 +109,7 @@ export async function GET() {
++       installed: true,
++       settings: settings,
++       hasRouter: hasRouter,
+++      hasBackup: await hasToolBackup("claude"),
++       exaMcpEnabled: !!claudeJson?.mcpServers?.exa,
++       settingsPath: getClaudeSettingsPath(),
++     });
++@@ -135,6 +137,12 @@ export async function POST(request) {
++     const settingsPath = getClaudeSettingsPath();
++     const claudeDir = path.dirname(settingsPath);
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("claude", {
+++      settings: settingsPath,
+++      claudeJson: getClaudeJsonPath(),
+++    });
+++
++     // Ensure .claude directory exists
++     await fs.mkdir(claudeDir, { recursive: true });
++ 
++@@ -212,9 +220,19 @@ const RESET_ENV_KEYS = [
++   "CLAUDE_CODE_AUTO_COMPACT_WINDOW",
++ ];
++ 
++-// DELETE - Reset settings (remove env fields)
+++// DELETE - Restore original settings from backup or reset settings (remove env fields)
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("claude");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Claude Code configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const settingsPath = getClaudeSettingsPath();
++ 
++     // Read current settings
++diff --git a/src/app/api/cli-tools/cline-settings/route.js b/src/app/api/cli-tools/cline-settings/route.js
++index 0254132..07217bf 100644
++--- a/src/app/api/cli-tools/cline-settings/route.js
+++++ b/src/app/api/cli-tools/cline-settings/route.js
++@@ -7,6 +7,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -69,6 +70,7 @@ export async function GET() {
++         openAiModelId: globalState?.openAiModelId,
++       },
++       hasRouter: hasRouterConfig(globalState),
+++      hasBackup: await hasToolBackup("cline"),
++       globalStatePath: getGlobalStatePath(),
++     });
++   } catch (error) {
++@@ -84,6 +86,12 @@ export async function POST(request) {
++       return NextResponse.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
++     }
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("cline", {
+++      globalState: getGlobalStatePath(),
+++      secrets: getSecretsPath(),
+++    });
+++
++     await fs.mkdir(getDataDir(), { recursive: true });
++ 
++     // Cline expects base WITHOUT /v1
++@@ -110,6 +118,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("cline");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Cline configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const globalState = await readJson(getGlobalStatePath());
++     if (!globalState) {
++       return NextResponse.json({ success: true, message: "No settings file to reset" });
++diff --git a/src/app/api/cli-tools/codewhale-settings/route.js b/src/app/api/cli-tools/codewhale-settings/route.js
++index 1b46f49..1175f5d 100644
++--- a/src/app/api/cli-tools/codewhale-settings/route.js
+++++ b/src/app/api/cli-tools/codewhale-settings/route.js
++@@ -8,6 +8,7 @@ import { exec } from "child_process";
++ import { promisify } from "util";
++ import { parseTOML, stringifyTOML } from "confbox";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -32,7 +33,7 @@ const checkCodewhaleInstalled = async () => {
++ 
++ const hasRouterConfig = (content) => {
++   if (!content) return false;
++-  return content.includes(`managed by ${BRAND.name}`) || content.includes("localhost:20128");
+++  return content.includes(`managed by ${BRAND.name}`) || content.includes("localhost:20120") || content.includes("localhost:20128");
++ };
++ 
++ const readConfig = async () => {
++@@ -64,6 +65,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter: hasRouterConfig(content),
+++      hasBackup: await hasToolBackup("codewhale"),
++       configPath: getCodewhaleConfigPath(),
++     });
++   } catch (err) {
++@@ -86,6 +88,12 @@ export async function POST(request) {
++     }
++ 
++     const configPath = getCodewhaleConfigPath();
+++
+++    // Backup original files before making changes
+++    await backupToolFiles("codewhale", {
+++      config: configPath,
+++    });
+++
++     await fs.mkdir(getCodewhaleDir(), { recursive: true });
++ 
++     let existing = {};
++@@ -119,6 +127,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("codewhale");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original CodeWhale configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = getCodewhaleConfigPath();
++     let existing = {};
++     try {
++diff --git a/src/app/api/cli-tools/codex-settings/route.js b/src/app/api/cli-tools/codex-settings/route.js
++index 2a6eab6..8ae681b 100644
++--- a/src/app/api/cli-tools/codex-settings/route.js
+++++ b/src/app/api/cli-tools/codex-settings/route.js
++@@ -6,6 +6,7 @@ import path from "path";
++ import os from "os";
++ import { parseTOML, stringifyTOML } from "confbox";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ export const dynamic = "force-dynamic";
++ 
++@@ -99,6 +100,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter: hasRouterConfig(config),
+++      hasBackup: await hasToolBackup("codex"),
++       configPath: getCodexConfigPath(),
++     });
++   } catch (error) {
++@@ -119,6 +121,12 @@ export async function POST(request) {
++     const codexDir = getCodexDir();
++     const configPath = getCodexConfigPath();
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("codex", {
+++      config: configPath,
+++      auth: getCodexAuthPath(),
+++    });
+++
++     // Ensure directory exists
++     await fs.mkdir(codexDir, { recursive: true });
++ 
++@@ -163,9 +171,19 @@ export async function POST(request) {
++   }
++ }
++ 
++-// DELETE - Remove FlagshipRouter settings only (keep other settings)
+++// DELETE - Restore original settings from backup or remove FlagshipRouter settings
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("codex");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Codex configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = getCodexConfigPath();
++ 
++     // Read and parse existing config
++diff --git a/src/app/api/cli-tools/copilot-settings/route.js b/src/app/api/cli-tools/copilot-settings/route.js
++index 7f6d289..9a8a39b 100644
++--- a/src/app/api/cli-tools/copilot-settings/route.js
+++++ b/src/app/api/cli-tools/copilot-settings/route.js
++@@ -5,6 +5,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ // Resolve chatLanguageModels.json path per OS
++ const getConfigPath = () => {
++@@ -51,6 +52,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter: hasRouterConfig(config),
+++      hasBackup: await hasToolBackup("copilot"),
++       configPath: getConfigPath(),
++       currentModel: entry?.models?.[0]?.id || null,
++       currentUrl: entry?.models?.[0]?.url || null,
++@@ -71,6 +73,12 @@ export async function POST(request) {
++     }
++ 
++     const configPath = getConfigPath();
+++
+++    // Backup original files before making changes
+++    await backupToolFiles("copilot", {
+++      config: configPath,
+++    });
+++
++     await fs.mkdir(path.dirname(configPath), { recursive: true });
++ 
++     // Read existing config array
++@@ -123,6 +131,16 @@ export async function POST(request) {
++ // DELETE - Remove FlagshipRouter entry from chatLanguageModels.json
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("copilot");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Copilot configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = getConfigPath();
++ 
++     let config = [];
++diff --git a/src/app/api/cli-tools/cowork-settings/route.js b/src/app/api/cli-tools/cowork-settings/route.js
++index c48b397..f272ab7 100644
++--- a/src/app/api/cli-tools/cowork-settings/route.js
+++++ b/src/app/api/cli-tools/cowork-settings/route.js
++@@ -8,6 +8,7 @@ import crypto from "crypto";
++ import { DEFAULT_PLUGINS, LOCAL_STDIO_PLUGINS, buildManagedMcpServers } from "@/shared/constants/coworkPlugins";
++ import { UPDATER_CONFIG } from "@/shared/constants/config";
++ import { getConsistentMachineId } from "@/shared/utils/machineId";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const APP_PORT = UPDATER_CONFIG.appPort;
++ const CLI_TOKEN_HEADER = "x-fr-cli-token";
++@@ -275,6 +276,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter,
+++      hasBackup: await hasToolBackup("cowork"),
++       configPath,
++       cowork: {
++         appliedId,
++@@ -334,6 +336,11 @@ export async function POST(request) {
++     const meta = await ensureMeta();
++     const configPath = path.join(getWriteConfigDir(), `${meta.appliedId}.json`);
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("cowork", {
+++      config: configPath,
+++    });
+++
++     const newConfig = {
++       ...SECURITY_RELAX,
++       inferenceProvider: PROVIDER,
++@@ -370,6 +377,18 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("cowork");
+++    if (backupResult.restored) {
+++      try { await writeSkipApprovals([]); } catch { /* ignore */ }
+++      try { await cleanup1pLegacy(); } catch { /* ignore */ }
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Cowork configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const meta = await readJson(await getMetaPath());
++     if (!meta?.appliedId) {
++       return NextResponse.json({ success: true, message: "No active config to reset" });
++diff --git a/src/app/api/cli-tools/crush-settings/route.js b/src/app/api/cli-tools/crush-settings/route.js
++index f64135b..ce0484f 100644
++--- a/src/app/api/cli-tools/crush-settings/route.js
+++++ b/src/app/api/cli-tools/crush-settings/route.js
++@@ -7,6 +7,7 @@ import os from "os";
++ import { exec } from "child_process";
++ import { promisify } from "util";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -38,7 +39,7 @@ const hasRouterConfig = (settings) => {
++   const p = settings.providers[BRAND.modelPrefix];
++   if (p && p.base_url) return true;
++   for (const prov of Object.values(settings.providers)) {
++-    if (prov.base_url && prov.base_url.includes("20128")) return true;
+++    if (prov.base_url && (prov.base_url.includes("20120") || prov.base_url.includes("20128"))) return true;
++   }
++   return false;
++ };
++@@ -69,6 +70,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter: hasRouterConfig(config),
+++      hasBackup: await hasToolBackup("crush"),
++       configPath: getCrushConfigPath(),
++     });
++   } catch (err) {
++@@ -91,6 +93,12 @@ export async function POST(request) {
++     }
++ 
++     const configPath = getCrushConfigPath();
+++
+++    // Backup original files before making changes
+++    await backupToolFiles("crush", {
+++      config: configPath,
+++    });
+++
++     await fs.mkdir(getCrushDir(), { recursive: true });
++ 
++     let existing = {};
++@@ -133,6 +141,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("crush");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Crush configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = getCrushConfigPath();
++     let existing = {};
++     try {
++diff --git a/src/app/api/cli-tools/deepseek-tui-settings/route.js b/src/app/api/cli-tools/deepseek-tui-settings/route.js
++index 1c12c1c..f6f29f8 100644
++--- a/src/app/api/cli-tools/deepseek-tui-settings/route.js
+++++ b/src/app/api/cli-tools/deepseek-tui-settings/route.js
++@@ -7,6 +7,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -115,6 +116,7 @@ export async function GET() {
++             installed: true,
++             settings: config,
++             hasRouter: hasRouterConfig(config),
+++            hasBackup: await hasToolBackup("deepseek-tui"),
++             configPath: getDeepSeekConfigPath(),
++         });
++     } catch (error) {
++@@ -131,6 +133,13 @@ export async function POST(request) {
++         }
++ 
++         const dir = getDeepSeekDir();
+++        const configPath = getDeepSeekConfigPath();
+++
+++        // Backup original files before making changes
+++        await backupToolFiles("deepseek-tui", {
+++            config: configPath,
+++        });
+++
++         await fs.mkdir(dir, { recursive: true });
++ 
++         const newConfig = buildRouterConfig(baseUrl, apiKey || `sk_${BRAND.modelPrefix}`, model);
++@@ -149,6 +158,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++     try {
+++        // Attempt restoring original configuration from backup first
+++        const backupResult = await restoreToolBackup("deepseek-tui");
+++        if (backupResult.restored) {
+++            return NextResponse.json({
+++                success: true,
+++                message: "Original DeepSeek TUI configuration restored successfully",
+++                restoredFromBackup: true,
+++            });
+++        }
+++
++         const configPath = getDeepSeekConfigPath();
++         try {
++             await fs.access(configPath);
++diff --git a/src/app/api/cli-tools/droid-settings/route.js b/src/app/api/cli-tools/droid-settings/route.js
++index 6f4e875..292a5d2 100644
++--- a/src/app/api/cli-tools/droid-settings/route.js
+++++ b/src/app/api/cli-tools/droid-settings/route.js
++@@ -7,6 +7,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -70,8 +71,9 @@ export async function GET() {
++ 
++     return NextResponse.json({
++       installed: true,
++-      settings,
+++      settings: settings,
++       hasRouter: hasRouterConfig(settings),
+++      hasBackup: await hasToolBackup("droid"),
++       settingsPath: getDroidSettingsPath(),
++     });
++   } catch (error) {
++@@ -97,6 +99,11 @@ export async function POST(request) {
++     const droidDir = getDroidDir();
++     const settingsPath = getDroidSettingsPath();
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("droid", {
+++      settings: settingsPath,
+++    });
+++
++     // Ensure directory exists
++     await fs.mkdir(droidDir, { recursive: true });
++ 
++@@ -175,6 +182,16 @@ export async function POST(request) {
++ // DELETE - Remove FlagshipRouter customModels only (keep other settings)
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("droid");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Factory Droid configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const settingsPath = getDroidSettingsPath();
++ 
++     // Read existing settings
++diff --git a/src/app/api/cli-tools/forge-settings/route.js b/src/app/api/cli-tools/forge-settings/route.js
++index 2b99869..0f152e7 100644
++--- a/src/app/api/cli-tools/forge-settings/route.js
+++++ b/src/app/api/cli-tools/forge-settings/route.js
++@@ -8,6 +8,7 @@ import { exec } from "child_process";
++ import { promisify } from "util";
++ import { parseTOML, stringifyTOML } from "confbox";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -32,7 +33,7 @@ const checkForgeInstalled = async () => {
++ 
++ const hasRouterConfig = (content) => {
++   if (!content) return false;
++-  return content.includes(`managed by ${BRAND.name}`) || content.includes("localhost:20128");
+++  return content.includes(`managed by ${BRAND.name}`) || content.includes("localhost:20120") || content.includes("localhost:20128");
++ };
++ 
++ const readConfig = async () => {
++@@ -64,6 +65,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter: hasRouterConfig(content),
+++      hasBackup: await hasToolBackup("forge"),
++       configPath: getForgeConfigPath(),
++     });
++   } catch (err) {
++@@ -86,6 +88,12 @@ export async function POST(request) {
++     }
++ 
++     const configPath = getForgeConfigPath();
+++
+++    // Backup original files before making changes
+++    await backupToolFiles("forge", {
+++      config: configPath,
+++    });
+++
++     await fs.mkdir(getForgeDir(), { recursive: true });
++ 
++     let existing = {};
++@@ -119,6 +127,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("forge");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original ForgeCode configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = getForgeConfigPath();
++     let existing = {};
++     try {
++diff --git a/src/app/api/cli-tools/grok-build-settings/route.js b/src/app/api/cli-tools/grok-build-settings/route.js
++index 104c4cd..309a519 100644
++--- a/src/app/api/cli-tools/grok-build-settings/route.js
+++++ b/src/app/api/cli-tools/grok-build-settings/route.js
++@@ -14,6 +14,7 @@ import {
++   resetGrokBuildConfig,
++ } from "@/lib/grokBuildConfig";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -89,6 +90,7 @@ export async function GET() {
++       installed: true,
++       settings,
++       hasRouter: hasRouterConfig(settings),
+++      hasBackup: await hasToolBackup("grok-build"),
++       configPath: getGrokConfigPath(),
++     });
++   } catch (error) {
++@@ -105,6 +107,13 @@ export async function POST(request) {
++       return NextResponse.json({ error: "baseUrl and model are required" }, { status: 400 });
++     }
++ 
+++    const configPath = getGrokConfigPath();
+++
+++    // Backup original files before making changes
+++    await backupToolFiles("grok-build", {
+++      config: configPath,
+++    });
+++
++     await fs.mkdir(getGrokDir(), { recursive: true });
++     const normalizedBaseUrl = baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`;
++     const toml = applyGrokBuildConfig(await readConfigToml(), {
++@@ -130,6 +139,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("grok-build");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Grok Build configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = getGrokConfigPath();
++     let toml;
++     try {
++diff --git a/src/app/api/cli-tools/hermes-settings/route.js b/src/app/api/cli-tools/hermes-settings/route.js
++index 0898268..46fea08 100644
++--- a/src/app/api/cli-tools/hermes-settings/route.js
+++++ b/src/app/api/cli-tools/hermes-settings/route.js
++@@ -7,6 +7,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -178,6 +179,7 @@ export async function GET() {
++       installed: true,
++       settings: { model, delegation, auxiliary },
++       hasRouter: hasRouterConfig(model) || hasRouterConfig(delegation) || Object.values(auxiliary).some(hasRouterConfig),
+++      hasBackup: await hasToolBackup("hermes"),
++       configPath: getHermesConfigPath(),
++     });
++   } catch (error) {
++@@ -200,6 +202,15 @@ export async function POST(request) {
++     }
++ 
++     const dir = getHermesDir();
+++    const configPath = getHermesConfigPath();
+++    const envPath = getHermesEnvPath();
+++
+++    // Backup original files before making changes
+++    await backupToolFiles("hermes", {
+++      config: configPath,
+++      env: envPath,
+++    });
+++
++     await fs.mkdir(dir, { recursive: true });
++ 
++     const normalizedBaseUrl = baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`;
++@@ -237,6 +248,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("hermes");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Hermes configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = getHermesConfigPath();
++     let yaml = "";
++     try {
++diff --git a/src/app/api/cli-tools/jcode-settings/route.js b/src/app/api/cli-tools/jcode-settings/route.js
++index 5b80671..01442db 100644
++--- a/src/app/api/cli-tools/jcode-settings/route.js
+++++ b/src/app/api/cli-tools/jcode-settings/route.js
++@@ -8,6 +8,7 @@ import { exec } from "child_process";
++ import { promisify } from "util";
++ import { parseTOML, stringifyTOML } from "confbox";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const JCODE_API_KEY_ENV = `JCODE_${BRAND.slug.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`;
++ 
++@@ -55,7 +56,7 @@ const hasRouterConfig = (config) => {
++   if (providers[BRAND.modelPrefix]) return true;
++ 
++   for (const [name, provider] of Object.entries(providers)) {
++-    if (provider.base_url && provider.base_url.includes("localhost:20128")) {
+++    if (provider.base_url && (provider.base_url.includes("localhost:20120") || provider.base_url.includes("localhost:20128"))) {
++       return true;
++     }
++   }
++@@ -127,6 +128,7 @@ export async function GET() {
++     installed: true,
++     config,
++     hasRouter,
+++    hasBackup: await hasToolBackup("jcode"),
++     configPath: getConfigPath(),
++   });
++ }
++@@ -142,6 +144,12 @@ export async function POST(request) {
++       );
++     }
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("jcode", {
+++      config: getConfigPath(),
+++      env: getProviderEnvPath(),
+++    });
+++
++     const normalizedBaseUrl = baseUrl.endsWith("/v1")
++       ? baseUrl
++       : `${baseUrl}/v1`;
++@@ -191,6 +199,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("jcode");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original jcode configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const config = await readConfig();
++ 
++     if (!config.providers) {
++diff --git a/src/app/api/cli-tools/kilo-settings/route.js b/src/app/api/cli-tools/kilo-settings/route.js
++index 6d318ff..17b6f5b 100644
++--- a/src/app/api/cli-tools/kilo-settings/route.js
+++++ b/src/app/api/cli-tools/kilo-settings/route.js
++@@ -7,6 +7,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -64,6 +65,7 @@ export async function GET() {
++       installed: true,
++       settings: { auth: auth ? Object.keys(auth) : [] },
++       hasRouter: hasRouterConfig(auth),
+++      hasBackup: await hasToolBackup("kilo"),
++       authPath: getAuthPath(),
++     });
++   } catch (error) {
++@@ -79,6 +81,12 @@ export async function POST(request) {
++       return NextResponse.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
++     }
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("kilo", {
+++      auth: getAuthPath(),
+++      vscode: getVscodeSettingsPath(),
+++    });
+++
++     await fs.mkdir(getDataDir(), { recursive: true });
++ 
++     const normalizedBaseUrl = baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`;
++@@ -109,6 +117,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("kilo");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Kilo Code configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const auth = await readJson(getAuthPath());
++     if (!auth) {
++       return NextResponse.json({ success: true, message: "No settings file to reset" });
++diff --git a/src/app/api/cli-tools/omp-settings/route.js b/src/app/api/cli-tools/omp-settings/route.js
++index 7641758..e0efd07 100644
++--- a/src/app/api/cli-tools/omp-settings/route.js
+++++ b/src/app/api/cli-tools/omp-settings/route.js
++@@ -7,6 +7,7 @@ import os from "os";
++ import { exec } from "child_process";
++ import { promisify } from "util";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -46,7 +47,7 @@ const readModelsYml = async () => {
++ 
++ const hasRouterInYml = (content) => {
++   if (!content) return false;
++-  return content.includes(`${BRAND.modelPrefix}:`) || content.includes("localhost:20128");
+++  return content.includes(`${BRAND.modelPrefix}:`) || content.includes("localhost:20120") || content.includes("localhost:20128");
++ };
++ 
++ // Build standard FlagshipRouter provider block for models.yml
++@@ -80,6 +81,7 @@ export async function GET() {
++     return NextResponse.json({
++       installed: true,
++       hasRouter,
+++      hasBackup: await hasToolBackup("omp"),
++       configPath: getOmpModelsYmlPath(),
++     });
++   } catch (err) {
++@@ -101,6 +103,11 @@ export async function POST(request) {
++       return NextResponse.json({ error: { message: "baseUrl is required" } }, { status: 400 });
++     }
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("omp", {
+++      config: getOmpModelsYmlPath(),
+++    });
+++
++     await fs.mkdir(getOmpDir(), { recursive: true });
++ 
++     let ymlContent = await readModelsYml();
++@@ -160,6 +167,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("omp");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Oh My Pi configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     let ymlContent = await readModelsYml();
++     const regex = new RegExp(`\\s*${PROVIDER_ID}:[\\s\\S]*?(?=\\n\\s*\\w+:|$)`, "g");
++     ymlContent = ymlContent.replace(regex, "");
++diff --git a/src/app/api/cli-tools/openclaw-settings/route.js b/src/app/api/cli-tools/openclaw-settings/route.js
++index 510945a..4c76678 100644
++--- a/src/app/api/cli-tools/openclaw-settings/route.js
+++++ b/src/app/api/cli-tools/openclaw-settings/route.js
++@@ -7,6 +7,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -107,6 +108,7 @@ export async function GET() {
++       settings,
++       agents: enrichedAgents,
++       hasRouter: hasRouterConfig(settings),
+++      hasBackup: await hasToolBackup("openclaw"),
++       settingsPath: getOpenClawSettingsPath(),
++     });
++   } catch (error) {
++@@ -148,6 +150,11 @@ export async function POST(request) {
++     const openclawDir = getOpenClawDir();
++     const settingsPath = getOpenClawSettingsPath();
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("openclaw", {
+++      settings: settingsPath,
+++    });
+++
++     await fs.mkdir(openclawDir, { recursive: true });
++ 
++     let settings = {};
++@@ -238,6 +245,16 @@ export async function POST(request) {
++ // DELETE - Remove FlagshipRouter settings only (keep other settings)
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("openclaw");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Open Claw configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const settingsPath = getOpenClawSettingsPath();
++ 
++     // Read existing settings
++diff --git a/src/app/api/cli-tools/opencode-settings/route.js b/src/app/api/cli-tools/opencode-settings/route.js
++index 9e7fc0c..ab71937 100644
++--- a/src/app/api/cli-tools/opencode-settings/route.js
+++++ b/src/app/api/cli-tools/opencode-settings/route.js
++@@ -7,6 +7,7 @@ import fs from "fs/promises";
++ import path from "path";
++ import os from "os";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -75,6 +76,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter: hasRouterConfig(config),
+++      hasBackup: await hasToolBackup("opencode"),
++       configPath: getConfigPath(),
++         opencode: {
++           models: Object.keys(modelMap),
++@@ -103,6 +105,11 @@ export async function POST(request) {
++     const configDir = getConfigDir();
++     const configPath = getConfigPath();
++ 
+++    // Backup original files before making changes
+++    await backupToolFiles("opencode", {
+++      config: configPath,
+++    });
+++
++     await fs.mkdir(configDir, { recursive: true });
++ 
++     // Read existing config or start fresh
++@@ -214,6 +221,19 @@ export async function DELETE(request) {
++   try {
++     const { searchParams } = new URL(request.url);
++     const modelToRemove = searchParams.get("model");
+++
+++    // If removing all / resetting and a backup exists, restore it
+++    if (!modelToRemove) {
+++      const backupResult = await restoreToolBackup("opencode");
+++      if (backupResult.restored) {
+++        return NextResponse.json({
+++          success: true,
+++          message: "Original OpenCode configuration restored successfully",
+++          restoredFromBackup: true,
+++        });
+++      }
+++    }
+++
++     const configPath = getConfigPath();
++ 
++     let config = {};
++diff --git a/src/app/api/cli-tools/pi-settings/route.js b/src/app/api/cli-tools/pi-settings/route.js
++index fac58e3..26f226b 100644
++--- a/src/app/api/cli-tools/pi-settings/route.js
+++++ b/src/app/api/cli-tools/pi-settings/route.js
++@@ -7,6 +7,7 @@ import os from "os";
++ import { exec } from "child_process";
++ import { promisify } from "util";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -43,7 +44,7 @@ const hasRouterConfig = (settings) => {
++   const p = settings.providers[BRAND.modelPrefix];
++   if (p && p.baseUrl) return true;
++   for (const prov of Object.values(settings.providers)) {
++-    if (prov.baseUrl && prov.baseUrl.includes("20128")) return true;
+++    if (prov.baseUrl && (prov.baseUrl.includes("20120") || prov.baseUrl.includes("20128"))) return true;
++   }
++   return false;
++ };
++@@ -92,6 +93,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter: hasRouterConfig(config),
+++      hasBackup: await hasToolBackup("pi"),
++       configPath,
++     });
++   } catch (err) {
++@@ -114,6 +116,12 @@ export async function POST(request) {
++     }
++ 
++     const configPath = await resolveModelsJsonPath();
+++
+++    // Backup original files before making changes
+++    await backupToolFiles("pi", {
+++      config: configPath,
+++    });
+++
++     await fs.mkdir(path.dirname(configPath), { recursive: true });
++ 
++     let existing = {};
++@@ -166,6 +174,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("pi");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Pi configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = await resolveModelsJsonPath();
++     let existing = {};
++     try {
++diff --git a/src/app/api/cli-tools/smelt-settings/route.js b/src/app/api/cli-tools/smelt-settings/route.js
++index 7ce488e..a1554ed 100644
++--- a/src/app/api/cli-tools/smelt-settings/route.js
+++++ b/src/app/api/cli-tools/smelt-settings/route.js
++@@ -7,6 +7,7 @@ import os from "os";
++ import { exec } from "child_process";
++ import { promisify } from "util";
++ import { BRAND } from "open-sse/config/brand.js";
+++import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
++ 
++ const execAsync = promisify(exec);
++ 
++@@ -33,7 +34,7 @@ const hasRouterConfig = (settings) => {
++   if (!settings) return false;
++   return (
++     settings._managedBy === BRAND.modelPrefix ||
++-    (typeof settings.baseUrl === "string" && settings.baseUrl.length > 0 && settings.baseUrl.includes("20128"))
+++    (typeof settings.baseUrl === "string" && settings.baseUrl.length > 0 && (settings.baseUrl.includes("20120") || settings.baseUrl.includes("20128")))
++   );
++ };
++ 
++@@ -63,6 +64,7 @@ export async function GET() {
++       installed: true,
++       config,
++       hasRouter: hasRouterConfig(config),
+++      hasBackup: await hasToolBackup("smelt"),
++       configPath: getSmeltConfigPath(),
++     });
++   } catch (err) {
++@@ -85,6 +87,12 @@ export async function POST(request) {
++     }
++ 
++     const configPath = getSmeltConfigPath();
+++
+++    // Backup original files before making changes
+++    await backupToolFiles("smelt", {
+++      config: configPath,
+++    });
+++
++     await fs.mkdir(getSmeltDir(), { recursive: true });
++ 
++     let existing = {};
++@@ -116,6 +124,16 @@ export async function POST(request) {
++ 
++ export async function DELETE() {
++   try {
+++    // Attempt restoring original configuration from backup first
+++    const backupResult = await restoreToolBackup("smelt");
+++    if (backupResult.restored) {
+++      return NextResponse.json({
+++        success: true,
+++        message: "Original Smelt configuration restored successfully",
+++        restoredFromBackup: true,
+++      });
+++    }
+++
++     const configPath = getSmeltConfigPath();
++     let existing = {};
++     try {
+diff --git a/open-sse/handlers/chatCore/sseToJsonHandler.js b/open-sse/handlers/chatCore/sseToJsonHandler.js
+index 800c92a..4f10bfb 100644
+--- a/open-sse/handlers/chatCore/sseToJsonHandler.js
++++ b/open-sse/handlers/chatCore/sseToJsonHandler.js
+@@ -50,6 +50,63 @@ function extractCustomToolInput(argumentsValue) {
+   return argumentsText;
+ }
+ 
++/**
++ * Chat Completions body → Anthropic Messages body.
++ * Used by the forced SSE→JSON path when the client speaks Claude (/v1/messages).
++ * Inlined (not imported from nonStreamingHandler.js) for the same circular-import
++ * reason as chatCompletionToResponses above.
++ */
++function chatCompletionToClaude(responseBody) {
++  const choice = responseBody?.choices?.[0];
++  if (!choice) return responseBody;
++
++  const message = choice.message || {};
++  const content = [];
++
++  const reasoning = message.reasoning_content || message.reasoning;
++  if (typeof reasoning === "string" && reasoning.length > 0) {
++    content.push({ type: "thinking", thinking: reasoning, signature: "" });
++  }
++  if (typeof message.content === "string" && message.content.length > 0) {
++    content.push({ type: "text", text: message.content });
++  }
++  for (const toolCall of message.tool_calls || []) {
++    const fn = toolCall.function || {};
++    let input = {};
++    const raw = fn.arguments || toolCall.arguments || "";
++    try { input = typeof raw === "string" ? JSON.parse(raw) : (raw || {}); } catch { input = {}; }
++    content.push({
++      type: "tool_use",
++      id: toolCall.id || `toolu_${Date.now()}_${content.length}`,
++      name: fn.name || toolCall.name || "",
++      input,
++    });
++  }
++  if (content.length === 0) content.push({ type: "text", text: "" });
++
++  const finish = choice.finish_reason;
++  const stopReason =
++    finish === "tool_calls" ? "tool_use" :
++    finish === "length" ? "max_tokens" :
++    finish === "content_filter" ? "end_turn" :
++    "end_turn";
++
++  const usage = responseBody.usage || {};
++  return {
++    id: String(responseBody.id || `msg_${Date.now()}`).replace(/^chatcmpl-/, ""),
++    type: "message",
++    role: "assistant",
++    model: responseBody.model || "unknown",
++    content,
++    stop_reason: stopReason,
++    stop_sequence: null,
++    usage: {
++      input_tokens: usage.prompt_tokens || usage.input_tokens || 0,
++      output_tokens: usage.completion_tokens || usage.output_tokens || 0,
++    },
++  };
++}
++
+ function chatCompletionToResponses(responseBody, customToolNames = null) {
+   const choice = responseBody?.choices?.[0];
+   if (!choice) return responseBody;
+@@ -280,6 +337,8 @@ export async function handleForcedSSEToJson({ providerResponse, sourceFormat, ta
+           choices: [{ index: 0, message, finish_reason: finishReason }],
+           usage: { prompt_tokens: inTokens, completion_tokens: outTokens, total_tokens: inTokens + outTokens, ...cacheDetails }
+         };
++        // Claude client behind a Responses-API provider — emit an Anthropic message body.
++        if (sourceFormat === FORMATS.CLAUDE) finalResp = chatCompletionToClaude(finalResp);
+       }
+ 
+       return { success: true, response: new Response(JSON.stringify(restoreToolNames(finalResp, toolNameMap)), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }) };
+@@ -358,7 +417,9 @@ export async function handleForcedSSEToJson({ providerResponse, sourceFormat, ta
+     // already imports parseSSEToOpenAIResponse from this module.
+     const finalBody = sourceFormat === FORMATS.OPENAI_RESPONSES
+       ? chatCompletionToResponses(parsed, customToolNames)
+-      : parsed;
++      : sourceFormat === FORMATS.CLAUDE
++        ? chatCompletionToClaude(parsed)
++        : parsed;
+ 
+     return { success: true, response: new Response(JSON.stringify(restoreToolNames(finalBody, toolNameMap)), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }) };
+   } catch (err) {
 diff --git a/src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js b/src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js
 index f5df083..6bacfe4 100644
 --- a/src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js
