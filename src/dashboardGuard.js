@@ -236,6 +236,9 @@ export async function proxy(request) {
 
   // Protect all dashboard routes
   if (pathname.startsWith("/dashboard")) {
+    // Desktop build: no login page — always allow dashboard access.
+    return NextResponse.next();
+    // eslint-disable-next-line no-unreachable
     let requireLogin = true;
     let tunnelDashboardAccess = true;
 

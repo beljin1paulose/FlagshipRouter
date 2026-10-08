@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS = {
     audioInput: { enabled: true, roundRobin: false, models: [] },
     videoInput: { enabled: false, roundRobin: false, models: [] },
   },
-  requireLogin: true,
+  requireLogin: false,
   requireApiKey: true,
   tunnelDashboardAccess: true,
   authMode: "password",

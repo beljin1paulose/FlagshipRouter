@@ -45,6 +45,16 @@ console.log("   node.exe copied from current runtime");
 fs.copyFileSync(path.join(root, "icon.ico"), path.join(dist, "icon.ico"));
 fs.copyFileSync(path.join(root, "icon.png"), path.join(dist, "icon.png"));
 
+// app.version drives the in-app updater: without it every EXE reads
+// "dev-local" and re-downloads the release zip on every launch.
+const verSrc = path.join(root, "windows", "bin", "app.version");
+if (fs.existsSync(verSrc)) {
+  fs.copyFileSync(verSrc, path.join(dist, "app.version"));
+  console.log("   app.version: " + fs.readFileSync(verSrc, "utf8").trim());
+} else {
+  console.warn("   WARNING: windows/bin/app.version missing — updater will see dev-local");
+}
+
 fs.writeFileSync(path.join(dist, "README.txt"), [
   "FlagshipRouter Desktop (Windows)",
   "===============================",
