@@ -50,6 +50,63 @@ function extractCustomToolInput(argumentsValue) {
   return argumentsText;
 }
 
+/**
+ * Chat Completions body → Anthropic Messages body.
+ * Used by the forced SSE→JSON path when the client speaks Claude (/v1/messages).
+ * Inlined (not imported from nonStreamingHandler.js) for the same circular-import
+ * reason as chatCompletionToResponses above.
+ */
+function chatCompletionToClaude(responseBody) {
+  const choice = responseBody?.choices?.[0];
+  if (!choice) return responseBody;
+
+  const message = choice.message || {};
+  const content = [];
+
+  const reasoning = message.reasoning_content || message.reasoning;
+  if (typeof reasoning === "string" && reasoning.length > 0) {
+    content.push({ type: "thinking", thinking: reasoning, signature: "" });
+  }
+  if (typeof message.content === "string" && message.content.length > 0) {
+    content.push({ type: "text", text: message.content });
+  }
+  for (const toolCall of message.tool_calls || []) {
+    const fn = toolCall.function || {};
+    let input = {};
+    const raw = fn.arguments || toolCall.arguments || "";
+    try { input = typeof raw === "string" ? JSON.parse(raw) : (raw || {}); } catch { input = {}; }
+    content.push({
+      type: "tool_use",
+      id: toolCall.id || `toolu_${Date.now()}_${content.length}`,
+      name: fn.name || toolCall.name || "",
+      input,
+    });
+  }
+  if (content.length === 0) content.push({ type: "text", text: "" });
+
+  const finish = choice.finish_reason;
+  const stopReason =
+    finish === "tool_calls" ? "tool_use" :
+    finish === "length" ? "max_tokens" :
+    finish === "content_filter" ? "end_turn" :
+    "end_turn";
+
+  const usage = responseBody.usage || {};
+  return {
+    id: String(responseBody.id || `msg_${Date.now()}`).replace(/^chatcmpl-/, ""),
+    type: "message",
+    role: "assistant",
+    model: responseBody.model || "unknown",
+    content,
+    stop_reason: stopReason,
+    stop_sequence: null,
+    usage: {
+      input_tokens: usage.prompt_tokens || usage.input_tokens || 0,
+      output_tokens: usage.completion_tokens || usage.output_tokens || 0,
+    },
+  };
+}
+
 function chatCompletionToResponses(responseBody, customToolNames = null) {
   const choice = responseBody?.choices?.[0];
   if (!choice) return responseBody;
@@ -280,6 +337,8 @@ export async function handleForcedSSEToJson({ providerResponse, sourceFormat, ta
           choices: [{ index: 0, message, finish_reason: finishReason }],
           usage: { prompt_tokens: inTokens, completion_tokens: outTokens, total_tokens: inTokens + outTokens, ...cacheDetails }
         };
+        // Claude client behind a Responses-API provider — emit an Anthropic message body.
+        if (sourceFormat === FORMATS.CLAUDE) finalResp = chatCompletionToClaude(finalResp);
       }
 
       return { success: true, response: new Response(JSON.stringify(restoreToolNames(finalResp, toolNameMap)), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }) };
@@ -358,7 +417,9 @@ export async function handleForcedSSEToJson({ providerResponse, sourceFormat, ta
     // already imports parseSSEToOpenAIResponse from this module.
     const finalBody = sourceFormat === FORMATS.OPENAI_RESPONSES
       ? chatCompletionToResponses(parsed, customToolNames)
-      : parsed;
+      : sourceFormat === FORMATS.CLAUDE
+        ? chatCompletionToClaude(parsed)
+        : parsed;
 
     return { success: true, response: new Response(JSON.stringify(restoreToolNames(finalBody, toolNameMap)), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }) };
   } catch (err) {
