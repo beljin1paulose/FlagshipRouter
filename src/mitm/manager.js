@@ -18,7 +18,7 @@ const { DATA_DIR, MITM_DIR } = require("./paths");
 const { log, err } = require("./logger");
 const { LSOF_BIN } = require("./config");
 
-const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20120";
+const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20128";
 
 function shellQuoteSingle(str) {
   if (str == null || str === "") return "''";

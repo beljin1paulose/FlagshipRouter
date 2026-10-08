@@ -7,7 +7,6 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { BRAND } from "open-sse/config/brand.js";
-import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
 
 const execAsync = promisify(exec);
 
@@ -70,7 +69,6 @@ export async function GET() {
         openAiModelId: globalState?.openAiModelId,
       },
       hasRouter: hasRouterConfig(globalState),
-      hasBackup: await hasToolBackup("cline"),
       globalStatePath: getGlobalStatePath(),
     });
   } catch (error) {
@@ -85,12 +83,6 @@ export async function POST(request) {
     if (!baseUrl || !apiKey || !model) {
       return NextResponse.json({ error: "baseUrl, apiKey and model are required" }, { status: 400 });
     }
-
-    // Backup original files before making changes
-    await backupToolFiles("cline", {
-      globalState: getGlobalStatePath(),
-      secrets: getSecretsPath(),
-    });
 
     await fs.mkdir(getDataDir(), { recursive: true });
 
@@ -118,16 +110,6 @@ export async function POST(request) {
 
 export async function DELETE() {
   try {
-    // Attempt restoring original configuration from backup first
-    const backupResult = await restoreToolBackup("cline");
-    if (backupResult.restored) {
-      return NextResponse.json({
-        success: true,
-        message: "Original Cline configuration restored successfully",
-        restoredFromBackup: true,
-      });
-    }
-
     const globalState = await readJson(getGlobalStatePath());
     if (!globalState) {
       return NextResponse.json({ success: true, message: "No settings file to reset" });

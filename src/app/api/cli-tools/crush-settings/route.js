@@ -7,7 +7,6 @@ import os from "os";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { BRAND } from "open-sse/config/brand.js";
-import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
 
 const execAsync = promisify(exec);
 
@@ -39,7 +38,7 @@ const hasRouterConfig = (settings) => {
   const p = settings.providers[BRAND.modelPrefix];
   if (p && p.base_url) return true;
   for (const prov of Object.values(settings.providers)) {
-    if (prov.base_url && (prov.base_url.includes("20120") || prov.base_url.includes("20128"))) return true;
+    if (prov.base_url && prov.base_url.includes("20128")) return true;
   }
   return false;
 };
@@ -70,7 +69,6 @@ export async function GET() {
       installed: true,
       config,
       hasRouter: hasRouterConfig(config),
-      hasBackup: await hasToolBackup("crush"),
       configPath: getCrushConfigPath(),
     });
   } catch (err) {
@@ -93,12 +91,6 @@ export async function POST(request) {
     }
 
     const configPath = getCrushConfigPath();
-
-    // Backup original files before making changes
-    await backupToolFiles("crush", {
-      config: configPath,
-    });
-
     await fs.mkdir(getCrushDir(), { recursive: true });
 
     let existing = {};
@@ -141,16 +133,6 @@ export async function POST(request) {
 
 export async function DELETE() {
   try {
-    // Attempt restoring original configuration from backup first
-    const backupResult = await restoreToolBackup("crush");
-    if (backupResult.restored) {
-      return NextResponse.json({
-        success: true,
-        message: "Original Crush configuration restored successfully",
-        restoredFromBackup: true,
-      });
-    }
-
     const configPath = getCrushConfigPath();
     let existing = {};
     try {

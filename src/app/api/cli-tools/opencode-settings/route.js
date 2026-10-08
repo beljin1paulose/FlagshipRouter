@@ -7,7 +7,6 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { BRAND } from "open-sse/config/brand.js";
-import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
 
 const execAsync = promisify(exec);
 
@@ -76,7 +75,6 @@ export async function GET() {
       installed: true,
       config,
       hasRouter: hasRouterConfig(config),
-      hasBackup: await hasToolBackup("opencode"),
       configPath: getConfigPath(),
         opencode: {
           models: Object.keys(modelMap),
@@ -104,11 +102,6 @@ export async function POST(request) {
 
     const configDir = getConfigDir();
     const configPath = getConfigPath();
-
-    // Backup original files before making changes
-    await backupToolFiles("opencode", {
-      config: configPath,
-    });
 
     await fs.mkdir(configDir, { recursive: true });
 
@@ -221,19 +214,6 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const modelToRemove = searchParams.get("model");
-
-    // If removing all / resetting and a backup exists, restore it
-    if (!modelToRemove) {
-      const backupResult = await restoreToolBackup("opencode");
-      if (backupResult.restored) {
-        return NextResponse.json({
-          success: true,
-          message: "Original OpenCode configuration restored successfully",
-          restoredFromBackup: true,
-        });
-      }
-    }
-
     const configPath = getConfigPath();
 
     let config = {};

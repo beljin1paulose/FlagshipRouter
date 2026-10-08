@@ -7,7 +7,6 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import { BRAND } from "open-sse/config/brand.js";
-import { backupToolFiles, restoreToolBackup, hasToolBackup } from "@/lib/cliToolsBackup";
 
 const execAsync = promisify(exec);
 
@@ -108,7 +107,6 @@ export async function GET() {
       settings,
       agents: enrichedAgents,
       hasRouter: hasRouterConfig(settings),
-      hasBackup: await hasToolBackup("openclaw"),
       settingsPath: getOpenClawSettingsPath(),
     });
   } catch (error) {
@@ -149,11 +147,6 @@ export async function POST(request) {
 
     const openclawDir = getOpenClawDir();
     const settingsPath = getOpenClawSettingsPath();
-
-    // Backup original files before making changes
-    await backupToolFiles("openclaw", {
-      settings: settingsPath,
-    });
 
     await fs.mkdir(openclawDir, { recursive: true });
 
@@ -245,16 +238,6 @@ export async function POST(request) {
 // DELETE - Remove FlagshipRouter settings only (keep other settings)
 export async function DELETE() {
   try {
-    // Attempt restoring original configuration from backup first
-    const backupResult = await restoreToolBackup("openclaw");
-    if (backupResult.restored) {
-      return NextResponse.json({
-        success: true,
-        message: "Original Open Claw configuration restored successfully",
-        restoredFromBackup: true,
-      });
-    }
-
     const settingsPath = getOpenClawSettingsPath();
 
     // Read existing settings
