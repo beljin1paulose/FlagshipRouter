@@ -22,7 +22,7 @@ sealed class FlagshipRouterApp : Form
     // Auto-update: which GitHub repo publishes FlagshipRouter-windows-x64.zip
     // releases. CI on that repo rebuilds on upstream changes (see
     // .github/workflows/upstream-build.yml on the build branch).
-    const string UpdateOwner = "theRizwan";
+    const string UpdateOwner = "beljin1paulose";
     const string UpdateRepo = "FlagshipRouter";
     const string UpdateAsset = "FlagshipRouter-windows-x64.zip";
     // Baked at publish time; CI stamps this via /p:AppVersion=<sha>.
