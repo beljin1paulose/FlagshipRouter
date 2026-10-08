@@ -5,26 +5,37 @@ import { AI_MODELS } from "@/shared/constants/config";
 import { getProviderAlias } from "@/shared/constants/providers";
 import { getCapabilitiesForModel } from "open-sse/providers/capabilities.js";
 
-// Short-TTL response cache: the model list only changes when aliases or the
-// disabled list change (both are also invalidated below), but this route
-// rebuilds 1100+ entries with capability lookups on every call.
-const MODELS_TTL_MS = 15_000;
-let modelsCache = { at: 0, body: null };
+// Response cache validated by a cheap version key (aliases + disabled + custom
+// models — three fast DB reads). Building the list costs ~1s (1100+ entries ×
+// capability lookups), and it only changes when one of those three mutates, so
+// a page open is normally a memory hit while edits still show immediately.
+let modelsCache = { key: null, body: null };
 let modelsInflight = null;
 
-function invalidateModelsCache() {
-  modelsCache = { at: 0, body: null };
+async function modelsVersionKey() {
+  const [aliases, disabled, custom] = await Promise.all([
+    getModelAliases().catch(() => ({})),
+    getDisabledModels().catch(() => ({})),
+    getCustomModels().catch(() => []),
+  ]);
+  const a = Object.keys(aliases).sort().map((k) => `${k}=${aliases[k]}`).join(",");
+  const d = Object.entries(disabled)
+    .map(([k, v]) => `${k}=${[...(v || [])].sort().join("|")}`)
+    .sort().join(";");
+  const c = custom.map((m) => `${m.providerAlias}/${m.id}`).sort().join(",");
+  return `${a}::${d}::${c}`;
 }
 
 // GET /api/models - Get models with aliases
 export async function GET() {
-  if (modelsCache.body && Date.now() - modelsCache.at < MODELS_TTL_MS) {
+  const key = await modelsVersionKey();
+  if (modelsCache.body && modelsCache.key === key) {
     return NextResponse.json(modelsCache.body);
   }
   if (modelsInflight) return NextResponse.json(await modelsInflight);
   modelsInflight = buildModels()
     .then((body) => {
-      if (!body?.error) modelsCache = { at: Date.now(), body };
+      if (!body?.error) modelsCache = { key, body };
       return body;
     })
     .finally(() => { modelsInflight = null; });
@@ -117,9 +128,8 @@ export async function PUT(request) {
       return NextResponse.json({ error: "Alias already in use" }, { status: 400 });
     }
 
-    // Update alias
+    // Update alias (version key includes aliases — cache self-invalidates)
     await setModelAlias(model, alias);
-    invalidateModelsCache();
 
     return NextResponse.json({ success: true, model, alias });
   } catch (error) {
