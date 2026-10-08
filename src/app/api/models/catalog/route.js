@@ -88,20 +88,40 @@ function providerSummary(entry, connectedCount) {
 }
 
 // Response cache: building the catalog walks the whole registry and may hit
-// live model-list fetchers; the Models page re-fetches on every visit. Serve
-// a cached body for a short window and collapse concurrent builders into one.
-const CATALOG_TTL_MS = 15_000;
-let catalogCache = { at: 0, body: null };
+// live model-list fetchers (seconds). Validated by a cheap version key built
+// from two fast DB reads (active connections + disabled models), so connecting
+// a provider or disabling a model is reflected on the very next request — no
+// fixed TTL staleness, and a plain page open is a memory hit.
+let catalogCache = { key: null, body: null, at: 0 };
 let catalogInflight = null;
+const CATALOG_MAX_AGE_MS = 10 * 60 * 1000; // refresh live model lists at least this often
+
+async function catalogVersionKey() {
+  const [connections, disabled] = await Promise.all([
+    getProviderConnections().catch(() => []),
+    getDisabledModels().catch(() => ({})),
+  ]);
+  const conns = connections
+    .map((c) => `${c.provider}:${c.isActive === false ? 0 : 1}:${c.id || ""}`)
+    .sort()
+    .join(",");
+  const dis = Object.entries(disabled)
+    .map(([k, v]) => `${k}=${[...(v || [])].sort().join("|")}`)
+    .sort()
+    .join(";");
+  return `${conns}::${dis}`;
+}
 
 export async function GET() {
-  if (catalogCache.body && Date.now() - catalogCache.at < CATALOG_TTL_MS) {
-    return NextResponse.json(catalogCache.body);
-  }
+  const key = await catalogVersionKey();
+  const fresh = catalogCache.body
+    && catalogCache.key === key
+    && Date.now() - catalogCache.at < CATALOG_MAX_AGE_MS;
+  if (fresh) return NextResponse.json(catalogCache.body);
   if (catalogInflight) return NextResponse.json(await catalogInflight);
   catalogInflight = buildCatalog()
     .then((body) => {
-      if (!body?.error) catalogCache = { at: Date.now(), body };
+      if (!body?.error) catalogCache = { key, body, at: Date.now() };
       return body;
     })
     .finally(() => { catalogInflight = null; });
