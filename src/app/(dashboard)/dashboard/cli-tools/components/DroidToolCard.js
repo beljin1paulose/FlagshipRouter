@@ -359,8 +359,8 @@ export default function DroidToolCard({
                       />
                       <button
                         onClick={() => setModalOpen(true)}
-                        disabled={!hasActiveProviders}
-                        className={`px-2 py-1.5 rounded border text-xs shrink-0 ${hasActiveProviders ? "bg-surface border-border hover:border-primary cursor-pointer" : "opacity-50 cursor-not-allowed border-border"}`}
+                        
+                        className="px-2 py-1.5 rounded border text-xs shrink-0 bg-surface border-border hover:border-primary cursor-pointer"
                       >
                         Select
                       </button>

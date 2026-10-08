@@ -97,6 +97,7 @@ export default function ModelSelectModal({
   const [providerNodes, setProviderNodes] = useState([]);
   const [customModels, setCustomModels] = useState([]);
   const [disabledModels, setDisabledModels] = useState({});
+  const [catalogProviders, setCatalogProviders] = useState([]);
   // Cursor and Cline expose the usable catalog per account, so the static catalog is
   // kept only as a fallback: it goes stale quickly and entitlements differ per account.
   // Single map driven by LIVE_CATALOG_PROVIDERS so the constant cannot drift
@@ -181,6 +182,22 @@ export default function ModelSelectModal({
     if (isOpen) fetchDisabledModels();
   }, [isOpen]);
 
+  const fetchCatalogProviders = async () => {
+    try {
+      const res = await fetch("/api/models/catalog");
+      if (!res.ok) throw new Error(`catalog ${res.status}`);
+      const data = await res.json();
+      setCatalogProviders(Array.isArray(data.providers) ? data.providers : []);
+    } catch (error) {
+      console.error("Error fetching model catalog:", error);
+      setCatalogProviders([]);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) fetchCatalogProviders();
+  }, [isOpen]);
+
   const allProviders = useMemo(() => ({ ...OAUTH_PROVIDERS, ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...APIKEY_PROVIDERS }), []);
 
   // Group models by provider with priority order
@@ -212,10 +229,21 @@ export default function ModelSelectModal({
       ? NO_AUTH_PROVIDER_IDS.filter((id) => (AI_PROVIDERS[id]?.serviceKinds || ["llm"]).includes(kindFilter))
       : NO_AUTH_PROVIDER_IDS;
 
-    // Only show connected providers (including both standard and custom)
+    // Same catalog the Models page uses: every allowed provider with models,
+    // not only saved connections. Without this, combo/CLI pickers stay empty
+    // when the user has no connection rows even though Models shows hundreds.
+    const catalogIds = catalogProviders
+      .filter((p) => p && !p.hidden && p.models > 0)
+      .filter((p) => {
+        if (!kindFilter) return true;
+        return (AI_PROVIDERS[p.id]?.serviceKinds || ["llm"]).includes(kindFilter);
+      })
+      .map((p) => p.id);
+
     const providerIdsToShow = new Set([
-      ...activeConnectionIds,  // Only connected providers
-      ...noAuthIds,            // No-auth providers (kind-filtered)
+      ...activeConnectionIds,
+      ...noAuthIds,
+      ...catalogIds,
     ]);
 
     // Sort by PROVIDER_ORDER
@@ -420,7 +448,7 @@ export default function ModelSelectModal({
     });
 
     return groups;
-  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, cursorModels, clineModels, clinepassModels]);
+  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, cursorModels, clineModels, clinepassModels, catalogProviders]);
 
   // Filter combos by search query (and hide combos when kindFilter is set — combos are LLM-only by design)
   const filteredCombos = useMemo(() => {

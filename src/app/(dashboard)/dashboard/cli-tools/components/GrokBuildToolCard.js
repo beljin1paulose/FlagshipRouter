@@ -332,7 +332,7 @@ export default function GrokBuildToolCard({
                   <ApiKeySelect value={selectedApiKey} onChange={setSelectedApiKey} apiKeys={apiKeys} cloudEnabled={cloudEnabled} />
                 </div>
 
-                <ModelField label="Main Model" value={selectedModel} onChange={setSelectedModel} placeholder="provider/model-id" onSelect={() => setModelTarget("main")} disabled={!hasActiveProviders} />
+                <ModelField label="Main Model" value={selectedModel} onChange={setSelectedModel} placeholder="provider/model-id" onSelect={() => setModelTarget("main")} />
 
                 <div className="my-1 border-t border-border pt-3">
                   <div className="mb-2 flex items-start gap-2">
@@ -353,7 +353,6 @@ export default function GrokBuildToolCard({
                     onChange={(value) => setSubagentModels((current) => ({ ...current, [type.id]: value }))}
                     placeholder={`${selectedModel || "Main Model"} (inherit)`}
                     onSelect={() => setModelTarget(type.id)}
-                    disabled={!hasActiveProviders}
                   />
                 ))}
               </div>
