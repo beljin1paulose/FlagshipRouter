@@ -4,6 +4,14 @@ import { ANTIGRAVITY_IDE_USER_AGENT } from "../providers/shared.js";
 import { createRequire } from "module";
 import { BRAND } from "./brand.js";
 
+// Nous Portal requires attribution for some API-key models. Use a neutral
+// router identity rather than exposing a credential or claiming another client.
+export const NOUS_ATTRIBUTION = {
+  hostname: "inference-api.nousresearch.com",
+  chatCompletionsPath: "/v1/chat/completions",
+  tags: [`product=${BRAND.slug}`, `client=${BRAND.slug}`, `user=${BRAND.slug}`],
+};
+
 // === Gemini CLI === derive từ registry gemini-cli.transport
 export const GEMINI_CLI_VERSION = PROVIDERS["gemini-cli"]?.cliVersion;
 export const GEMINI_CLI_API_CLIENT = PROVIDERS["gemini-cli"]?.apiClient;
