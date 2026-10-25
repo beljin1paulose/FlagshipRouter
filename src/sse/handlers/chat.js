@@ -174,12 +174,22 @@ export async function handleChat(request, clientRawRequest = null) {
 
 /**
  * Handle single model chat request. A public model rename (brand.json → models.renames)
- * is routed to its upstream target and the response is presented under the public name.
+ * is routed to its upstream targets in order — the next one answers when one is at its
+ * limit or not connected — and the response is presented under the public name.
  */
 async function handleSingleModelChat(body, modelStr, clientRawRequest = null, request = null, apiKey = null, requestedModel = null) {
   const rename = findModelRename(modelStr);
   if (!rename) return routeSingleModelChat(body, modelStr, clientRawRequest, request, apiKey, requestedModel);
-  const response = await routeSingleModelChat(body, rename.target, clientRawRequest, request, apiKey, requestedModel);
+  const response = rename.targets.length > 1
+    ? await handleComboChat({
+      body,
+      models: rename.targets,
+      handleSingleModel: (b, m) => routeSingleModelChat(b, m, clientRawRequest, request, apiKey, requestedModel),
+      log,
+      comboName: `rename:${rename.id}`,
+      comboStrategy: "fallback",
+    })
+    : await routeSingleModelChat(body, rename.target, clientRawRequest, request, apiKey, requestedModel);
   return presentResponseAsModel(response, rename, modelStr);
 }
 

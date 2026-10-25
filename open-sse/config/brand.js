@@ -27,15 +27,25 @@ export const BRAND = Object.freeze({
 });
 
 // Public model renames: clients see `id`/`name`, the router calls `target` ("alias/model").
+// `targets` lists several free models in order; when one is at its limit or unavailable the
+// next one answers. `target` is always the first of them.
+const renameTargets = (r) => (Array.isArray(r.targets) ? r.targets : [r.target])
+  .filter((t) => typeof t === "string" && t.includes("/"))
+  .map((t) => t.trim());
+
 export const MODEL_RENAMES = Object.freeze(
   (RAW.models?.renames || [])
-    .filter((r) => r && typeof r.id === "string" && typeof r.target === "string" && r.target.includes("/"))
-    .map((r) => Object.freeze({
-      id: r.id.trim(),
-      name: (r.name || r.id).trim(),
-      target: r.target.trim(),
-      hideTarget: r.hideTarget !== false,
-    })),
+    .filter((r) => r && typeof r.id === "string" && renameTargets(r).length > 0)
+    .map((r) => {
+      const targets = Object.freeze(renameTargets(r));
+      return Object.freeze({
+        id: r.id.trim(),
+        name: (r.name || r.id).trim(),
+        target: targets[0],
+        targets,
+        hideTarget: r.hideTarget !== false,
+      });
+    }),
 );
 
 // Which registry entries the product exposes. Categories and the hasFree flag come from each

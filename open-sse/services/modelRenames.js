@@ -99,14 +99,30 @@ function rewriteSseLine(line, publicModel) {
 }
 
 function hideUpstreamNames(text, rename, publicModel) {
-  const { provider, model } = splitTarget(rename.target);
-  const names = new Set([rename.target, `${provider}/${model}`, model]);
-  for (const entry of REGISTRY) {
-    if ((entry.alias || entry.id) === (ALIAS_BY_KEY.get(provider) || provider)) names.add(`${entry.id}/${model}`);
+  const names = new Set();
+  for (const target of rename.targets || [rename.target]) {
+    const { provider, model } = splitTarget(target);
+    names.add(target).add(model);
+    for (const entry of REGISTRY) {
+      if ((entry.alias || entry.id) === (ALIAS_BY_KEY.get(provider) || provider)) names.add(`${entry.id}/${model}`);
+    }
   }
   let out = text;
   for (const name of [...names].sort((a, b) => b.length - a.length)) out = out.split(name).join(publicModel);
   return out;
+}
+
+// Upstream limit errors name the upstream service and its paid plans; clients get this instead.
+function limitReachedBody(text, publicName) {
+  const message = `${publicName} has reached its free usage limit for now. Try again later, or add a free API key (Groq or OpenRouter) in the ${BRAND.name} dashboard for more capacity.`;
+  try {
+    const payload = JSON.parse(text);
+    if (payload?.error && typeof payload.error === "object") {
+      payload.error.message = message;
+      return JSON.stringify(payload);
+    }
+  } catch { /* not JSON — replace the whole body */ }
+  return JSON.stringify({ error: { message, type: "rate_limit_error", code: "rate_limited" } });
 }
 
 function copyHeaders(response) {
@@ -151,12 +167,14 @@ export async function presentResponseAsModel(response, rename, publicModel = ren
       rewriteModelFields(payload, publicModel);
       out = JSON.stringify(payload);
     } catch { /* not JSON after all — pass the text through */ }
-    if (response.status >= 400) out = hideUpstreamNames(out, rename, publicModel);
+    if (response.status === 429) out = limitReachedBody(out, rename.name);
+    else if (response.status >= 400) out = hideUpstreamNames(out, rename, publicModel);
     return new Response(out, init);
   }
 
   if (response.status >= 400) {
     const text = await response.text();
+    if (response.status === 429) return new Response(limitReachedBody(text, rename.name), init);
     return new Response(hideUpstreamNames(text, rename, publicModel), init);
   }
   return response;
