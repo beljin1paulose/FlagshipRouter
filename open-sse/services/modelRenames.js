@@ -31,8 +31,10 @@ for (const rename of MODEL_RENAMES) {
   for (const key of [rename.id, rename.name, `${BRAND.modelPrefix}/${rename.id}`, `${BRAND.modelPrefix}/${rename.name}`]) {
     RENAME_BY_PUBLIC_KEY.set(normalizeKey(key), rename);
   }
-  const { provider, model } = splitTarget(rename.target);
-  RENAME_BY_TARGET.set(canonicalTarget(provider, model), rename);
+  for (const target of rename.targets) {
+    const { provider, model } = splitTarget(target);
+    RENAME_BY_TARGET.set(canonicalTarget(provider, model), rename);
+  }
 }
 
 export function listModelRenames() {
@@ -114,7 +116,7 @@ function hideUpstreamNames(text, rename, publicModel) {
 
 // Upstream limit errors name the upstream service and its paid plans; clients get this instead.
 function limitReachedBody(text, publicName) {
-  const message = `${publicName} has reached its free usage limit for now. Try again later, or add a free API key (Groq or OpenRouter) in the ${BRAND.name} dashboard for more capacity.`;
+  const message = `${publicName} has reached its free usage limit for now. Please try again later.`;
   try {
     const payload = JSON.parse(text);
     if (payload?.error && typeof payload.error === "object") {

@@ -27,8 +27,7 @@ export const BRAND = Object.freeze({
 });
 
 // Public model renames: clients see `id`/`name`, the router calls `target` ("alias/model").
-// `targets` lists several free models in order; when one is at its limit or unavailable the
-// next one answers. `target` is always the first of them.
+// `targets` lists several free models in order; when one is unavailable the next one answers. `target` is always the first of them.
 const renameTargets = (r) => (Array.isArray(r.targets) ? r.targets : [r.target])
   .filter((t) => typeof t === "string" && t.includes("/"))
   .map((t) => t.trim());
