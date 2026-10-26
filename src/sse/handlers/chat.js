@@ -31,6 +31,7 @@ import { isProviderAllowed } from "open-sse/providers/policy.js";
 import { BRAND } from "open-sse/config/brand.js";
 import { getKeyAccessContext, enforceKeyAccess, filterAdapterModels } from "../services/keyAccess.js";
 import { resolveSmartChoice } from "../services/systemoneRouter.js";
+import { hasValidCliToken } from "@/dashboardGuard.js";
 
 /**
  * Handle chat completion request
@@ -78,7 +79,10 @@ export async function handleChat(request, clientRawRequest = null) {
 
   // Enforce API key if enabled in settings
   const settings = await getSettings();
-  if (settings.requireApiKey) {
+  // The dashboard's own model test carries the machine-bound CLI token instead of a key,
+  // so it works before any API key has been created.
+  const isInternalTest = !apiKey && await hasValidCliToken(request);
+  if (settings.requireApiKey && !isInternalTest) {
     if (!apiKey) {
       log.warn("AUTH", "Missing API key (requireApiKey=true)");
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Missing API key");
